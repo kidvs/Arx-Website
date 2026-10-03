@@ -605,6 +605,12 @@ formEl.addEventListener('submit', async e => {
       return;
     }
 
+    if (res.status === 403 && data.status === 'ACCESS_DENIED') {
+      showBanAlert(data.message || 'Unauthorized access — Username not registered on club whitelist.');
+      lockForm();
+      return;
+    }
+
     if (res.status === 400 && data.status === 'FLAGGED') {
       showBanAlert(data.message || 'AI-generated content detected. Your application has been flagged and you are no longer eligible to apply.');
       lockForm();
