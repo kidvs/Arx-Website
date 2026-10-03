@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ARX — Elite multi-disciplinary tech collective for builders, tinkerers, and system architects across Web Dev, Robotics, Cybersecurity, and Python." />
+  <title>ARX // SYSTEMS ONLINE</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     APP SHELL
+═══════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ── NAVIGATION ── -->
+  <nav id="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#home" class="nav-brand" aria-label="ARX home">
+        ARX<span class="brand-accent">_</span>
+      </a>
+
+      <ul class="nav-links" role="list">
+        <li><a href="#home"    data-nav="home">HOME</a></li>
+        <li><a href="#about"   data-nav="about">ABOUT</a></li>
+        <li><a href="#domains" data-nav="domains">DOMAINS</a></li>
+        <li><a href="#signup"  data-nav="signup">APPLY</a></li>
+      </ul>
+
+      <button id="theme-toggle" aria-label="Toggle colour theme" aria-pressed="false">
+        <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        <span id="theme-label">LIGHT</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ══════════ #HOME ══════════ -->
+  <main id="view-home" class="view" role="main">
+
+    <!-- Hero -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container hero-grid">
+
+        <div class="hero-content">
+          <div class="hero-status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="status-text" id="home-recruit-status">SYSTEMS ONLINE // RECRUITMENT ACTIVE</span>
+          </div>
+
+          <h1 class="hero-title" id="hero-title">
+            WE<br>
+            <span class="c-cyan">LEARN</span> &amp;<br>
+            <span class="c-pink">BUILD</span>
+          </h1>
+
+          <p class="hero-sub">
+            <strong>ARX</strong> is a multi-disciplinary tech collective for builders,
+            tinkerers, and problem-solvers. We operate across
+            <strong>web development</strong>, <strong>robotics</strong>,
+            <strong>cybersecurity</strong>, and <strong>Python programming</strong> —
+            where curiosity becomes capability.
+          </p>
+
+          <div class="hero-cta">
+            <a href="#signup" class="btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              APPLY NOW
+            </a>
+            <a href="#domains" class="btn btn-pink">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              EXPLORE DOMAINS
+            </a>
+          </div>
+        </div>
+
+        <!-- Live status panel -->
+        <aside class="status-panel hud-panel" aria-label="System status" aria-live="polite">
+          <div class="status-panel-header">
+            <span>SYS_STATUS</span>
+            <span class="blink c-green">
+              <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
+              LIVE
+            </span>
+          </div>
+          <dl class="status-list" id="status-list">
+            <div class="status-row"><dt>CLUSTER</dt>       <dd class="c-green">OPERATIONAL</dd></div>
+            <div class="status-row"><dt>RECRUITMENT</dt>   <dd class="c-green" id="s-recruit">OPEN</dd></div>
+            <div class="status-row"><dt>ACTIVE_MEMBERS</dt><dd class="c-cyan"  id="s-members">--</dd></div>
+            <div class="status-row"><dt>PROJECTS</dt>      <dd class="c-cyan"  id="s-projects">--</dd></div>
+            <div class="status-row"><dt>TRACKS</dt>        <dd class="c-green" id="s-ctf">4_ACTIVE</dd></div>
+            <div class="status-row"><dt>NEXT_MEETING</dt>  <dd class="c-cyan"  id="s-meeting">--</dd></div>
+          </dl>
+        </aside>
+
+      </div>
+    </section>
+
+    <!-- Ticker -->
+    <div class="ticker-wrap" aria-hidden="true">
+      <div class="ticker">
+        <span class="ticker-item"><span class="c-cyan">ARX</span> // SYSTEMS ONLINE</span>
+        <span class="ticker-item">WEB DEV ⟶ <span class="c-cyan">SHIP IT TO PRODUCTION</span></span>
+        <span class="ticker-item">ROBOTICS ⟶ <span class="c-cyan">BRING IT TO LIFE</span></span>
+        <span class="ticker-item">CYBERSECURITY ⟶ <span class="c-cyan">MASTER THE GRID</span></span>
+        <span class="ticker-item">PYTHON ⟶ <span class="c-cyan">AUTOMATE EVERYTHING</span></span>
+        <span class="ticker-item">ARX COLLECTIVE ⟶ <span class="c-cyan">BUILD. LEARN. ITERATE.</span></span>
+        <!-- duplicate for seamless loop -->
+        <span class="ticker-item"><span class="c-cyan">ARX</span> // SYSTEMS ONLINE</span>
+        <span class="ticker-item">WEB DEV ⟶ <span class="c-cyan">SHIP IT TO PRODUCTION</span></span>
+        <span class="ticker-item">ROBOTICS ⟶ <span class="c-cyan">BRING IT TO LIFE</span></span>
+        <span class="ticker-item">CYBERSECURITY ⟶ <span class="c-cyan">MASTER THE GRID</span></span>
+        <span class="ticker-item">PYTHON ⟶ <span class="c-cyan">AUTOMATE EVERYTHING</span></span>
+        <span class="ticker-item">ARX COLLECTIVE ⟶ <span class="c-cyan">BUILD. LEARN. ITERATE.</span></span>
+      </div>
+    </div>
+
+  </main><!-- /#view-home -->
+
+  <!-- ══════════ #ABOUT ══════════ -->
+  <div id="view-about" class="view">
+    <section class="page-section">
+      <div class="container">
+
+        <div class="page-header">
+          <p class="section-label">// ABOUT ARX</p>
+          <h2 class="page-title">MISSION <span class="c-cyan">DIRECTIVE</span></h2>
+          <p class="page-subtitle">WHO WE ARE // WHAT WE STAND FOR</p>
+        </div>
+
+        <!-- Mission terminal -->
+        <div class="terminal hud-panel" role="region" aria-label="Mission terminal">
+          <div class="terminal-bar">
+            <span class="t-dot" aria-hidden="true"></span>
+            <span class="t-dot" aria-hidden="true"></span>
+            <span class="t-dot t-green" aria-hidden="true"></span>
+            <span class="terminal-title">arx@collective:~$ mission_brief --full</span>
+          </div>
+          <div class="terminal-body">
+            <p><span class="c-cyan">root@arx</span>:<span class="c-cyan">~</span>$ <span class="t-cmd">cat /etc/arx/mission.conf</span></p>
+            <br>
+            <p class="t-comment">##  ARX COLLECTIVE — MISSION DIRECTIVE v4.0  ##</p>
+            <br>
+            <p class="t-out">ARX was founded on a single axiom: <span class="c-green">technical mastery is not taught in a classroom — it is forged through real projects.</span></p>
+            <br>
+            <p class="t-out">We are a multi-disciplinary IT club that refuses to stay in one lane. ARX members
+              <span class="c-cyan">build responsive web apps</span>, <span class="c-pink">program autonomous robots</span>,
+              <span class="c-green">harden and probe systems</span>, and <span class="c-cyan">script Python tools</span> that solve real problems.
+              Every project ships. Every build teaches. Every failure iterates.
+            </p>
+            <br>
+            <p class="t-out">Our four pillars:</p>
+            <p class="t-out">&nbsp;&nbsp;<span class="c-cyan">[ WEB ]</span> — Design, code, and deploy. HTML, CSS, JavaScript from the ground up.</p>
+            <p class="t-out">&nbsp;&nbsp;<span class="c-pink">[ ROBOTICS ]</span> — Engineer machines that move, sense, and respond to the world.</p>
+            <p class="t-out">&nbsp;&nbsp;<span class="c-green">[ SECURITY ]</span> — Understand how systems break so you can build them stronger.</p>
+            <p class="t-out">&nbsp;&nbsp;<span class="c-cyan">[ PYTHON ]</span> — Automate, analyse, and create with one of the most powerful languages alive.</p>
+            <br>
+            <p class="t-out">We operate as an <span class="c-cyan">autonomous technical collective</span>.
+              No bureaucracy. No permission-seeking. If you can build it, build it.
+              If you can learn it, teach it — then go deeper.
+            </p>
+            <br>
+            <p><span class="c-cyan">root@arx</span>:<span class="c-cyan">~</span>$ <span class="cursor" aria-hidden="true"></span></p>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Leadership -->
+        <p class="section-label">// LEADERSHIP STRUCTURE</p>
+        <h3 class="page-title sm">COMMAND <span class="c-cyan">NODE</span></h3>
+
+        <div class="leadership-grid">
+          <div class="member-card hud-panel">
+            <p class="member-role">HEAD // CYBERSECURITY</p>
+            <p class="member-name">KIDUS ELIAS</p>
+            <p class="member-handle">Cybersecurity Expert</p>
+            <div class="tag-row">
+              <span class="tag">PENTEST</span><span class="tag">CTF</span><span class="tag">EXPLOIT_DEV</span>
+            </div>
+          </div>
+          <div class="member-card hud-panel">
+            <p class="member-role">HEAD // ROBOTICS</p>
+            <p class="member-name">NATAN YONAS</p>
+            <p class="member-handle">Robotics Expert</p>
+            <div class="tag-row">
+              <span class="tag">ARDUINO</span><span class="tag">SENSORS</span><span class="tag">AUTOMATION</span>
+            </div>
+          </div>
+          <div class="member-card hud-panel">
+            <p class="member-role">LEAD // WEB DEV</p>
+            <p class="member-name">YOHANNES NEGATU</p>
+            <p class="member-handle">Web Development</p>
+            <div class="tag-row">
+              <span class="tag">HTML</span><span class="tag">CSS</span><span class="tag">JAVASCRIPT</span>
+            </div>
+          </div>
+          <div class="member-card hud-panel">
+            <p class="member-role">LEAD // WEB DEV</p>
+            <p class="member-name">NATAN HADDIS</p>
+            <p class="member-handle">Web Development</p>
+            <div class="tag-row">
+              <span class="tag">HTML</span><span class="tag">CSS</span><span class="tag">JAVASCRIPT</span>
+            </div>
+          </div>
+          <div class="member-card hud-panel">
+            <p class="member-role">LEAD // WEB DEV</p>
+            <p class="member-name">JOHN DOE</p>
+            <p class="member-handle">Web Development</p>
+            <div class="tag-row">
+              <span class="tag">HTML</span><span class="tag">CSS</span><span class="tag">JAVASCRIPT</span>
+            </div>
+          </div>
+          <div class="member-card hud-panel">
+            <p class="member-role">HEAD // PYTHON</p>
+            <p class="member-name">LEAB MESGANAWGETINET</p>
+            <p class="member-handle">Python Expert</p>
+            <div class="tag-row">
+              <span class="tag">PYTHON</span><span class="tag">SCRIPTING</span><span class="tag">AUTOMATION</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Philosophy -->
+        <p class="section-label">// CORE PHILOSOPHY</p>
+        <h3 class="page-title sm">THE <span class="c-cyan">AXIOMS</span></h3>
+
+        <div class="philosophy-grid">
+          <div class="phi-item hud-panel">
+            <p class="phi-number">01</p>
+            <p class="phi-label">BUILD IN PUBLIC</p>
+            <p class="phi-desc">Every project, tool, and prototype is documented and shared within the collective. Your work belongs to the team.</p>
+          </div>
+          <div class="phi-item hud-panel">
+            <p class="phi-number">02</p>
+            <p class="phi-label">DEPTH OVER BREADTH</p>
+            <p class="phi-desc">We go deep. Surface-level tutorials are a starting point — not the destination. Read specs. Read source code. Understand the internals.</p>
+          </div>
+          <div class="phi-item hud-panel">
+            <p class="phi-number">03</p>
+            <p class="phi-label">CROSS-DOMAIN THINKING</p>
+            <p class="phi-desc">The best ideas live at intersections. A web dev who understands security, a roboticist who writes Python — that's where innovation happens.</p>
+          </div>
+          <div class="phi-item hud-panel">
+            <p class="phi-number">04</p>
+            <p class="phi-label">SHIP OR SCRAP</p>
+            <p class="phi-desc">Projects either ship to a working demo or are scrapped and lessons published. No perpetual WIPs gathering dust.</p>
+          </div>
+          <div class="phi-item hud-panel">
+            <p class="phi-number">05</p>
+            <p class="phi-label">COMMUNITY FIRST</p>
+            <p class="phi-desc">No gatekeeping. Radical knowledge sharing. We accelerate each other — beginners and veterans learning side by side.</p>
+          </div>
+          <div class="phi-item hud-panel">
+            <p class="phi-number">06</p>
+            <p class="phi-label">RADICAL HONESTY</p>
+            <p class="phi-desc">Mediocre work is called out — not to shame, but to improve. Constructive critique is the highest form of respect.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div><!-- /#view-about -->
+
+  <!-- ══════════ #DOMAINS ══════════ -->
+  <div id="view-domains" class="view">
+    <section class="page-section">
+      <div class="container">
+
+        <div class="page-header">
+          <p class="section-label">// OPERATIONAL SECTORS</p>
+          <h2 class="page-title">ACTIVE <span class="c-cyan">DOMAINS</span></h2>
+          <p class="page-subtitle">CHOOSE YOUR TRACK // MASTER YOUR CRAFT</p>
+        </div>
+
+        <div class="domains-grid">
+
+          <article class="domain-card hud-panel" aria-labelledby="dom-web">
+            <span class="domain-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </span>
+            <p class="domain-codename">// DOMAIN_01</p>
+            <h3 class="domain-name" id="dom-web">WEB DEVELOPMENT</h3>
+            <p class="domain-desc">
+              Front-end and back-end web engineering using HTML, CSS, and JavaScript.
+              We build real, deployed projects — portfolios, apps, APIs — and learn
+              UI/UX design, responsive layouts, and modern web tooling along the way.
+            </p>
+            <div class="tag-row mt-2">
+              <span class="tag">HTML</span><span class="tag">CSS</span>
+              <span class="tag">JAVASCRIPT</span><span class="tag">RESPONSIVE</span>
+              <span class="tag">UI/UX</span><span class="tag">NODE.JS</span>
+            </div>
+          </article>
+
+          <article class="domain-card hud-panel" aria-labelledby="dom-rob">
+            <span class="domain-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><line x1="8" y1="15" x2="8" y2="15"/><line x1="16" y1="15" x2="16" y2="15"/><path d="M12 3v2"/><circle cx="8" cy="15" r="1" fill="currentColor"/><circle cx="16" cy="15" r="1" fill="currentColor"/></svg>
+            </span>
+            <p class="domain-codename">// DOMAIN_02</p>
+            <h3 class="domain-name" id="dom-rob">ROBOTICS</h3>
+            <p class="domain-desc">
+              Hardware meets code. We design, build, and program robots using
+              microcontrollers, sensors, and actuators. From line-following bots
+              to autonomous navigation systems — if it moves, we build it.
+            </p>
+            <div class="tag-row mt-2">
+              <span class="tag">ARDUINO</span><span class="tag">RASPBERRY_PI</span>
+              <span class="tag">SENSORS</span><span class="tag">ACTUATORS</span>
+              <span class="tag">EMBEDDED</span><span class="tag">AUTOMATION</span>
+            </div>
+          </article>
+
+          <article class="domain-card hud-panel" aria-labelledby="dom-sec">
+            <span class="domain-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <p class="domain-codename">// DOMAIN_03</p>
+            <h3 class="domain-name" id="dom-sec">CYBERSECURITY</h3>
+            <p class="domain-desc">
+              Penetration testing, CTF operations, reverse engineering, and network security.
+              We learn how systems are attacked so we can build them to withstand real-world
+              threats. Weekly challenges, labs, and attack/defence drills.
+            </p>
+            <div class="tag-row mt-2">
+              <span class="tag">PENTEST</span><span class="tag">CTF</span>
+              <span class="tag">NETWORKING</span><span class="tag">REVERSE_ENG</span>
+              <span class="tag">OSINT</span><span class="tag">CRYPTO</span>
+            </div>
+          </article>
+
+          <article class="domain-card hud-panel" aria-labelledby="dom-py">
+            <span class="domain-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+            </span>
+            <p class="domain-codename">// DOMAIN_04</p>
+            <h3 class="domain-name" id="dom-py">PYTHON PROGRAMMING</h3>
+            <p class="domain-desc">
+              From scripts to full applications. We use Python to automate workflows,
+              analyse data, build bots, and prototype ideas fast. The go-to language for
+              anyone who wants to make computers do things for them.
+            </p>
+            <div class="tag-row mt-2">
+              <span class="tag">PYTHON3</span><span class="tag">SCRIPTING</span>
+              <span class="tag">AUTOMATION</span><span class="tag">DATA</span>
+              <span class="tag">BOTS</span><span class="tag">LIBRARIES</span>
+            </div>
+          </article>
+
+        </div><!-- /.domains-grid -->
+
+        <div class="divider"></div>
+
+        <!-- Unified toolchain -->
+        <div class="toolchain-section">
+          <p class="section-label text-center">// CROSS-DOMAIN STACK</p>
+          <h3 class="page-title sm text-center">UNIFIED <span class="c-cyan">TOOLCHAIN</span></h3>
+          <div class="tag-row centered mt-3">
+            <span class="tag">GIT</span><span class="tag">VS_CODE</span><span class="tag">GITHUB</span>
+            <span class="tag">CHROME_DEVTOOLS</span><span class="tag">FIGMA</span><span class="tag">ARDUINO_IDE</span>
+            <span class="tag">RASPBERRY_PI_OS</span><span class="tag">WIRESHARK</span>
+            <span class="tag">NMAP</span><span class="tag">BURP_SUITE</span><span class="tag">PYTHON3</span>
+            <span class="tag">JUPYTER</span><span class="tag">LINUX</span><span class="tag">DOCKER</span>
+          </div>
+          <div class="text-center mt-3">
+            <a href="#signup" class="btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              JOIN THE COLLECTIVE
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div><!-- /#view-domains -->
+
+  <!-- ══════════ #SIGNUP ══════════ -->
+  <div id="view-signup" class="view">
+    <section class="page-section">
+      <div class="container">
+
+        <div class="signup-grid">
+
+          <!-- Left info panel -->
+          <div class="signup-info">
+            <p class="section-label">// APPLICATION TERMINAL</p>
+            <h2 class="page-title">APPLY TO <span class="c-cyan">ARX</span></h2>
+
+            <p class="body-text mt-2">
+              We review every application personally. We're looking for genuine
+              curiosity, a desire to learn, and proof that you care about
+              building real things — not just credentials or buzzwords.
+            </p>
+            <p class="body-text mt-1">
+              Your essay is the most important part. Write something
+              <strong class="c-cyan">real</strong>. Tell us what you've built,
+              what you want to learn, or what problem you want to solve with tech.
+            </p>
+
+            <ul class="req-list mt-2">
+              <li>Minimum 150 characters in your essay</li>
+              <li>Write in your own voice — be authentic and specific</li>
+              <li>Password: min 8 chars, mixed case + digit</li>
+              <li>Applications reviewed within 48 hours</li>
+            </ul>
+
+            <div class="divider"></div>
+
+            <div class="hud-panel detection-info">
+              <p class="section-label">// WHAT WE LOOK FOR</p>
+              <p class="body-text mt-1">
+                ARX values <span class="c-cyan">authentic thinking</span>.
+                Tell us about a project you worked on, a problem you got stuck on,
+                a technology you taught yourself, or simply why tech excites you.
+                There are no wrong answers — only honest ones.
+              </p>
+            </div>
+          </div><!-- /.signup-info -->
+
+          <!-- Right form panel -->
+          <div class="signup-form-col">
+            <div class="hud-panel form-panel">
+
+              <!-- Alert banner (errors / warnings) -->
+              <div class="form-alert" id="form-alert" role="alert" aria-live="assertive" hidden></div>
+
+              <!-- Success state -->
+              <div class="form-success" id="form-success" role="status" hidden>
+                <span class="success-icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </span>
+                <h3 class="success-title">APPLICATION RECEIVED</h3>
+                <p class="body-text mt-1">
+                  Your application has been logged. The ARX committee
+                  will review it within 48 hours. If selected, you
+                  will receive an invite to the private onboarding channel.<br><br>
+                  <strong class="c-cyan">// Stay curious. Keep building.</strong>
+                </p>
+              </div>
+
+              <!-- Form -->
+              <form class="arx-form" id="arx-form" novalidate autocomplete="off" aria-label="ARX application form">
+
+                <div class="form-group">
+                  <label class="form-label" for="f-username">
+                    HANDLE / USERNAME <span class="req-star" aria-label="required">*</span>
+                  </label>
+                  <input
+                    class="form-input"
+                    type="text"
+                    id="f-username"
+                    name="username"
+                    placeholder="e.g., techbuilder99"
+                    maxlength="32"
+                    autocomplete="off"
+                    spellcheck="false"
+                    required
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="f-password">
+                    SET PASSWORD <span class="req-star" aria-label="required">*</span>
+                  </label>
+                  <input
+                    class="form-input"
+                    type="password"
+                    id="f-password"
+                    name="password"
+                    placeholder="min. 8 chars, uppercase + digit"
+                    autocomplete="new-password"
+                    required
+                  />
+                  <div class="pw-strength" id="pw-strength" aria-label="Password strength" role="img">
+                    <div class="pw-bar" id="pw-b1"></div>
+                    <div class="pw-bar" id="pw-b2"></div>
+                    <div class="pw-bar" id="pw-b3"></div>
+                    <div class="pw-bar" id="pw-b4"></div>
+                  </div>
+                  <span class="pw-label" id="pw-label" aria-live="polite"></span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="f-essay">
+                    WHY DO YOU WANT TO JOIN ARX? <span class="req-star" aria-label="required">*</span>
+                  </label>
+                  <textarea
+                    class="form-textarea"
+                    id="f-essay"
+                    name="essay"
+                    placeholder="Tell us about what you've built, what you want to learn, or what excites you about tech. Be specific. Be real."
+                    minlength="150"
+                    required
+                  ></textarea>
+                  <div class="char-row">
+                    <span class="char-count" id="char-count" aria-live="polite">0 chars</span>
+                    <span class="char-min">min. 150</span>
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-full" id="submit-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  SUBMIT APPLICATION
+                </button>
+
+              </form><!-- /#arx-form -->
+
+            </div><!-- /.hud-panel.form-panel -->
+          </div><!-- /.signup-form-col -->
+
+        </div><!-- /.signup-grid -->
+
+      </div>
+    </section>
+  </div><!-- /#view-signup -->
+
+  <!-- ── FOOTER ── -->
+  <footer id="footer" aria-label="Site footer">
+    <span class="footer-brand">ARX_</span>
+    <span id="footer-clock" aria-label="Current time"></span>
+    <span>// COLLECTIVE &copy; <span id="footer-year"></span> — ALL SYSTEMS OPERATIONAL</span>
+  </footer>
+
+</div><!-- /#app -->
+
+<script src="script.js"></script>
+</body>
+</html>
