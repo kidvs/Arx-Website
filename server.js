@@ -228,16 +228,7 @@ app.use(helmet({
 app.use(cors({ origin: ['http://localhost:3000', 'http://127.0.0.1:3000'] }));
 app.use(express.json({ limit: '16kb' }));
 
-/* Serve uploaded certificates — admin-only (requires active session) */
-app.use('/uploads/certificates', (req, res, next) => {
-  if (req.session && req.session.isAdmin) return next();
-  // Allow direct access only from admin panel referer in dev
-  const ref = req.headers.referer || '';
-  if (ref.includes('/admin')) return next();
-  return res.status(403).json({ error: 'FORBIDDEN' });
-}, express.static(UPLOAD_DIR));
-
-/* Session middleware (required for admin auth) */
+/* Session middleware (required for admin auth and protected uploads) */
 app.use(session({
   secret: SESSION_SECRET || 'arx-dev-insecure-fallback-change-me',
   resave: false,
@@ -250,6 +241,15 @@ app.use(session({
     maxAge: 2 * 60 * 60 * 1000,     // 2 hours
   },
 }));
+
+/* Serve uploaded certificates — admin-only (requires active session) */
+app.use('/uploads/certificates', (req, res, next) => {
+  if (req.session && req.session.isAdmin) return next();
+  // Allow direct access only from admin panel referer in dev
+  const ref = req.headers.referer || '';
+  if (ref.includes('/admin')) return next();
+  return res.status(403).json({ error: 'FORBIDDEN' });
+}, express.static(UPLOAD_DIR));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
