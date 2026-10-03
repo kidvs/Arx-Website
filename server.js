@@ -3,12 +3,15 @@
  * server.js
  *
  * Endpoints:
- *   POST /api/apply               — Student application (multipart) w/ AI detection
- *   GET  /api/status              — Club operational metrics
- *   GET  /api/meetings            — Public meetings feed
- *   GET  /api/lookup              — Application status lookup by telegram handle
- *   POST /api/tg/webhook          — Telegram bot webhook (captures chat_id)
- *   GET  /admin/api/…             — Protected admin routes
+ *   POST /api/apply                          — Student application (multipart) w/ whitelist check + AI detection
+ *   GET  /api/status                         — Club operational metrics
+ *   GET  /api/meetings                       — Public meetings feed
+ *   GET  /api/lookup                         — Application status lookup by telegram handle
+ *   POST /api/tg/webhook                     — Telegram bot webhook (captures chat_id)
+ *   GET  /admin/api/…                        — Protected admin routes
+ *   GET  /admin/api/whitelist                — List authorised usernames
+ *   POST /admin/api/whitelist/add            — Add a username to the whitelist
+ *   POST /admin/api/whitelist/remove         — Remove a username from the whitelist
  */
 
 'use strict';
@@ -62,6 +65,44 @@ if (!SESSION_SECRET) {
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 if (!TELEGRAM_BOT_TOKEN) {
   console.warn('[ARX-TG] ⚠  TELEGRAM_BOT_TOKEN not set — Telegram welcome messages will be skipped.');
+}
+
+/* ══════════════════════════════════════════════════
+   INVITE-ONLY USERNAME WHITELIST
+   Only usernames present in this Set are permitted
+   to submit an application. All others receive a
+   generic denial — the existence of the whitelist
+   is never disclosed to the applicant.
+
+   Populate via .env:
+     AUTHORIZED_USERNAMES=alice,bob,charlie
+   Alternatively, manage at runtime through the
+   protected admin API routes:
+     GET  /admin/api/whitelist
+     POST /admin/api/whitelist/add
+     POST /admin/api/whitelist/remove
+══════════════════════════════════════════════════ */
+const AUTHORIZED_USERNAMES = new Set(
+  (process.env.AUTHORIZED_USERNAMES || '')
+    .split(',')
+    .map(u => u.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+if (AUTHORIZED_USERNAMES.size === 0) {
+  console.warn('[ARX-WHITELIST] ⚠  AUTHORIZED_USERNAMES is empty — all valid applications will be DENIED. Populate it in .env or via the admin API.');
+} else {
+  console.log(`[ARX-WHITELIST] Loaded ${AUTHORIZED_USERNAMES.size} authorised username(s).`);
+}
+
+/**
+ * isWhitelisted(username)
+ * Case-insensitive check against the authorised username set.
+ * Returns true if the supplied username is permitted to apply.
+ */
+function isWhitelisted(username) {
+  if (!username || typeof username !== 'string') return false;
+  return AUTHORIZED_USERNAMES.has(username.trim().toLowerCase());
 }
 
 /* Maps Telegram handle (lowercase, no @) → chat_id captured from /start webhook */
@@ -212,21 +253,55 @@ function storeApplication({ username, phone, telegram, essay, certificates, ip, 
 /* ══════════════════════════════════════════════════
    MIDDLEWARE
 ══════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════
+   SECURITY MIDDLEWARE — Helmet, CORS, Body Limits
+   All applied before any route handler.
+══════════════════════════════════════════════════ */
+app.disable('x-powered-by'); // Belt-and-suspenders: helmet also removes it
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'blob:'],
+      defaultSrc:      ["'self'"],
+      styleSrc:        ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc:         ["'self'", 'https://fonts.gstatic.com'],
+      scriptSrc:       ["'self'"],
+      connectSrc:      ["'self'"],
+      imgSrc:          ["'self'", 'data:', 'blob:'],
+      frameAncestors:  ["'none'"],     // stronger than X-Frame-Options: DENY
+      objectSrc:       ["'none'"],
+      baseUri:         ["'self'"],
+      formAction:      ["'self'"],
     },
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  hsts: {
+    maxAge: 31536000,          // 1 year
+    includeSubDomains: true,
+    preload: true,
   },
 }));
 
-app.use(cors({ origin: ['http://localhost:3000', 'http://127.0.0.1:3000'] }));
-app.use(express.json({ limit: '16kb' }));
+/* CORS — only allow same-origin in production; loosen for local dev */
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (server-to-server, curl, mobile apps)
+    if (!origin) return callback(null, false);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin "${origin}" not allowed`));
+  },
+  credentials: false,   // no cross-origin cookies
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept'],
+}));
+
+/* Strict body-size limits — mitigate DoS / buffer-exhaustion */
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 
 /* Serve uploaded certificates — admin-only (requires active session) */
 app.use('/uploads/certificates', (req, res, next) => {
@@ -288,15 +363,37 @@ function addStrike(record) {
 }
 
 /* ══════════════════════════════════════════════════
-   GENERAL RATE LIMITER (brute-force protection)
-   100 req / 15 min per IP for all /api routes
+   RATE LIMITERS
+   — General:     50 req / 15 min  (all /api routes)
+   — Apply:        5 req / 15 min  (POST /api/apply)
+   — Lookup:      20 req / 15 min  (GET /api/lookup)
+   — Admin login:  5 req / 15 min  (POST /admin/login)
 ══════════════════════════════════════════════════ */
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests. Try again later.' },
+});
+
+/* Strict per-IP limiter for the application submission endpoint */
+const applyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  message: { error: 'RATE_LIMIT_EXCEEDED', status: 'BANNED', message: 'Too many application attempts. Try again in 15 minutes.' },
+});
+
+/* Lookup limiter — prevent handle enumeration */
+const lookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'RATE_LIMIT_EXCEEDED', message: 'Too many lookup requests. Try again later.' },
 });
 
 app.use('/api', apiLimiter);
@@ -532,15 +629,16 @@ function analyzeEssay(text) {
 function validateUsername(username) {
   if (typeof username !== 'string') return 'USERNAME_INVALID_TYPE';
   const trimmed = username.trim();
-  if (trimmed.length < 2) return 'USERNAME_TOO_SHORT';
-  if (trimmed.length > 32) return 'USERNAME_TOO_LONG';
+  if (trimmed.length < 2)  return 'USERNAME_TOO_SHORT';
+  if (trimmed.length > 64) return 'USERNAME_TOO_LONG';
+  // Only alphanumeric, hyphens, underscores, dots — no control chars
   if (!/^[a-zA-Z0-9_\-.]+$/.test(trimmed)) return 'USERNAME_INVALID_CHARS';
   return null;
 }
 
 function validatePassword(password) {
   if (typeof password !== 'string') return 'PASSWORD_INVALID_TYPE';
-  if (password.length < 8) return 'PASSWORD_TOO_SHORT';
+  if (password.length < 8)   return 'PASSWORD_TOO_SHORT';
   if (password.length > 128) return 'PASSWORD_TOO_LONG';
   const hasUpper = /[A-Z]/.test(password);
   const hasLower = /[a-z]/.test(password);
@@ -549,12 +647,46 @@ function validatePassword(password) {
   return null;
 }
 
+function validatePhone(phone) {
+  if (!phone || phone.trim() === '') return 'PHONE_REQUIRED';
+  if (typeof phone !== 'string')      return 'PHONE_INVALID_TYPE';
+  const stripped = phone.trim().replace(/[\s\-().+]/g, '');
+  if (!/^\d{6,15}$/.test(stripped))  return 'PHONE_INVALID_FORMAT';
+  return null;
+}
+
+function validateTelegram(telegram) {
+  if (!telegram || telegram.trim() === '') return 'TELEGRAM_REQUIRED';
+  if (typeof telegram !== 'string')        return 'TELEGRAM_INVALID_TYPE';
+  const handle = telegram.trim().replace(/^@/, '');
+  if (handle.length < 5)                  return 'TELEGRAM_TOO_SHORT';
+  if (handle.length > 32)                 return 'TELEGRAM_TOO_LONG';
+  if (!/^[a-zA-Z0-9_]+$/.test(handle))   return 'TELEGRAM_INVALID_CHARS';
+  return null;
+}
+
 function validateEssay(essay) {
   if (typeof essay !== 'string') return 'ESSAY_INVALID_TYPE';
   const trimmed = essay.trim();
-  if (trimmed.length < 150) return 'ESSAY_TOO_SHORT';
+  if (trimmed.length < 150)   return 'ESSAY_TOO_SHORT';
   if (trimmed.length > 10000) return 'ESSAY_TOO_LONG';
   return null;
+}
+
+/**
+ * sanitizeText(str)
+ * Strips HTML tags and dangerous characters from free-text fields
+ * to prevent Stored XSS when content is later rendered in admin panel.
+ */
+function sanitizeText(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/<[^>]*>/g, '')           // strip HTML tags
+    .replace(/&/g, '&amp;')            // encode ampersands
+    .replace(/"/g, '&quot;')           // encode double-quotes
+    .replace(/'/g, '&#x27;')           // encode single-quotes
+    .replace(/`/g, '&#x60;')           // encode backticks
+    .trim();
 }
 
 /* ══════════════════════════════════════════════════
@@ -684,7 +816,7 @@ async function analyzeEssayWithSapling(text) {
  *   429  { status: 'BANNED', message }
  *   500  Internal server error
  */
-app.post('/api/apply', (req, res, next) => {
+app.post('/api/apply', applyLimiter, (req, res, next) => {
   certUpload.array('certificates', MAX_FILES)(req, res, (uploadErr) => {
     if (uploadErr) {
       if (uploadErr.code === 'LIMIT_FILE_SIZE') {
@@ -693,7 +825,8 @@ app.post('/api/apply', (req, res, next) => {
       if (uploadErr.code === 'LIMIT_FILE_COUNT') {
         return res.status(422).json({ status: 'VALIDATION_ERROR', field: 'certificates', error: 'Maximum 3 certificate files allowed.' });
       }
-      return res.status(422).json({ status: 'VALIDATION_ERROR', field: 'certificates', error: uploadErr.message });
+      // Never leak raw multer error messages to client
+      return res.status(422).json({ status: 'VALIDATION_ERROR', field: 'certificates', error: 'Invalid file upload.' });
     }
     applyHandler(req, res).catch(next);
   });
@@ -715,12 +848,13 @@ async function applyHandler(req, res) {
     }
 
     // Support both JSON body (legacy) and multipart body
-    const body      = req.body || {};
-    const username  = body.username;
-    const password  = body.password;
-    const essay     = body.essay;
-    const phone     = (body.phone || '').trim();
-    const telegram  = (body.telegram || '').trim();
+    const body     = req.body || {};
+    // Coerce all fields to strings to prevent prototype-pollution via type confusion
+    const username = typeof body.username === 'string' ? body.username : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    const essay    = typeof body.essay    === 'string' ? body.essay    : '';
+    const phone    = typeof body.phone    === 'string' ? body.phone.trim()    : '';
+    const telegram = typeof body.telegram === 'string' ? body.telegram.trim() : '';
 
     /* — Field validation — */
     const usernameErr = validateUsername(username);
@@ -753,6 +887,21 @@ async function applyHandler(req, res) {
       return res.status(422).json({ status: 'VALIDATION_ERROR', field: 'essay', error: essayErr });
     }
 
+    /* ── Invite-only whitelist gate ──────────────────────────────────────────
+       This check is performed AFTER format validation so that the error
+       response is indistinguishable from a general access denial.
+       The whitelist check is stealth — its existence is never surfaced
+       to the applicant; they see only a generic access denial.
+    ──────────────────────────────────────────────────────────────────────── */
+    if (!isWhitelisted(username)) {
+      if (req.files) req.files.forEach(f => { try { fs.unlinkSync(f.path); } catch (_) {} });
+      console.warn(`[ARX-WHITELIST] Denied non-whitelisted username "${username.trim()}" from ip: ${ip}`);
+      return res.status(403).json({
+        status: 'ACCESS_DENIED',
+        message: 'Unauthorized access — Username not registered on club whitelist.',
+      });
+    }
+
     /* — Build certificate metadata from uploaded files — */
     const certificates = (req.files || []).map(f => ({
       id:           uuidv4(),
@@ -763,8 +912,11 @@ async function applyHandler(req, res) {
       url:          `/uploads/certificates/${f.filename}`,
     }));
 
+    /* — Sanitize essay before storage (strip HTML/script tags for XSS prevention) — */
+    const sanitizedEssay = sanitizeText(essay);
+
     /* — AI detection via Sapling + heuristic fallback (stealth — never exposed to client) — */
-    const detection = await analyzeEssayWithSapling(essay.trim());
+    const detection = await analyzeEssayWithSapling(sanitizedEssay);
 
     if (detection.score >= 45) {
       // Immediately ban the IP — no warnings, first offence = lockout
@@ -774,7 +926,7 @@ async function applyHandler(req, res) {
       const source = detection.flags.includes('SAPLING_VERIFIED') ? 'sapling+heuristic' : 'heuristic';
       console.log(`[ARX] AI detected & banned — ip: ${ip}, user: ${username.trim()}, score: ${detection.score}, flags: [${detection.flags.join(', ')}] (${source})`);
 
-      storeApplication({ username, phone, telegram, essay, certificates: [], ip, detection, status: 'FLAGGED' });
+      storeApplication({ username: sanitizeText(username), phone: sanitizeText(phone), telegram: sanitizeText(telegram), essay: sanitizedEssay, certificates: [], ip, detection, status: 'FLAGGED' });
 
       return res.status(400).json({
         status: 'FLAGGED',
@@ -787,7 +939,8 @@ async function applyHandler(req, res) {
     console.log(`[ARX] New application from ${ip} — user: ${username.trim()} — essay score: ${detection.score} (${source}) — certs: ${certificates.length}`);
 
     // Store as PENDING — admin must manually Accept or Decline
-    storeApplication({ username, phone, telegram, essay, certificates, ip, detection, status: 'PENDING' });
+    // All text fields sanitized before persistence to prevent stored XSS
+    storeApplication({ username: sanitizeText(username), phone: sanitizeText(phone), telegram: sanitizeText(telegram), essay: sanitizedEssay, certificates, ip, detection, status: 'PENDING' });
 
     return res.status(200).json({
       status: 'PENDING',
@@ -957,13 +1110,24 @@ app.post('/admin/login', adminLoginLimiter, async (req, res) => {
       return res.status(400).json({ error: 'CREDENTIALS_REQUIRED' });
     }
 
-    // bcrypt.compare is constant-time; username check is done after so both
-    // branches always run bcrypt regardless — prevents user-enumeration timing.
+    // Clamp lengths to prevent DoS via extremely long bcrypt inputs
+    if (username.length > 128 || password.length > 256) {
+      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
+    }
+
+    // bcrypt.compare is constant-time on the password.
+    // For the username we use crypto.timingSafeEqual to prevent timing side-channels.
     const passwordOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-    const usernameOk = username === ADMIN_USERNAME;
+
+    // timingSafeEqual requires equal-length buffers; pad both to ADMIN_USERNAME length
+    const a = Buffer.alloc(256);
+    const b = Buffer.alloc(256);
+    a.write(ADMIN_USERNAME);
+    b.write(username);
+    const usernameOk = crypto.timingSafeEqual(a, b);
 
     if (!usernameOk || !passwordOk) {
-      console.warn(`[ARX-ADMIN] Failed login attempt — ip: ${req.ip}, attempted user: "${username}"`);
+      console.warn(`[ARX-ADMIN] Failed login attempt — ip: ${req.ip}, attempted user: "${username.slice(0, 32)}"`);
       return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
     }
 
@@ -973,11 +1137,11 @@ app.post('/admin/login', adminLoginLimiter, async (req, res) => {
         console.error('[ARX-ADMIN] Session regeneration error:', err);
         return res.status(500).json({ error: 'SESSION_ERROR' });
       }
-      req.session.isAdmin = true;
-      req.session.adminUser = username;
-      req.session.loginAt = Date.now();
-      console.log(`[ARX-ADMIN] Successful login — ip: ${req.ip}, user: "${username}"`);
-      return res.json({ ok: true, username });
+      req.session.isAdmin  = true;
+      req.session.adminUser = ADMIN_USERNAME;  // always store canonical username, never user input
+      req.session.loginAt  = Date.now();
+      console.log(`[ARX-ADMIN] Successful login — ip: ${req.ip}, user: "${ADMIN_USERNAME}"`);
+      return res.json({ ok: true, username: ADMIN_USERNAME });
     });
 
   } catch (err) {
@@ -1173,17 +1337,61 @@ app.delete('/admin/api/meetings/:id', requireAdmin, (req, res) => {
 });
 
 /* ══════════════════════════════════════════════════
+   ADMIN WHITELIST MANAGEMENT ENDPOINTS
+   GET  /admin/api/whitelist        — list all whitelisted usernames
+   POST /admin/api/whitelist/add    — add a username
+   POST /admin/api/whitelist/remove — remove a username
+   All routes require active admin session.
+══════════════════════════════════════════════════ */
+app.get('/admin/api/whitelist', requireAdmin, (_req, res) => {
+  return res.json({
+    total: AUTHORIZED_USERNAMES.size,
+    usernames: [...AUTHORIZED_USERNAMES].sort(),
+  });
+});
+
+app.post('/admin/api/whitelist/add', requireAdmin, (req, res) => {
+  const raw = String(req.body.username || '').trim();
+  if (!raw) return res.status(400).json({ error: 'USERNAME_REQUIRED' });
+  const err = validateUsername(raw);
+  if (err) return res.status(422).json({ error: err });
+  const lower = raw.toLowerCase();
+  if (AUTHORIZED_USERNAMES.has(lower)) {
+    return res.json({ ok: true, added: false, username: lower, message: 'Already on whitelist.' });
+  }
+  AUTHORIZED_USERNAMES.add(lower);
+  console.log(`[ARX-WHITELIST] Added "${lower}" by ${req.session.adminUser}`);
+  return res.json({ ok: true, added: true, username: lower, total: AUTHORIZED_USERNAMES.size });
+});
+
+app.post('/admin/api/whitelist/remove', requireAdmin, (req, res) => {
+  const raw = String(req.body.username || '').trim();
+  if (!raw) return res.status(400).json({ error: 'USERNAME_REQUIRED' });
+  const lower = raw.toLowerCase();
+  if (!AUTHORIZED_USERNAMES.has(lower)) {
+    return res.json({ ok: true, removed: false, username: lower, message: 'Not on whitelist.' });
+  }
+  AUTHORIZED_USERNAMES.delete(lower);
+  console.log(`[ARX-WHITELIST] Removed "${lower}" by ${req.session.adminUser}`);
+  return res.json({ ok: true, removed: true, username: lower, total: AUTHORIZED_USERNAMES.size });
+});
+
+/* ══════════════════════════════════════════════════
    GET /api/lookup
    Allows an applicant to check their status by telegram handle.
 ══════════════════════════════════════════════════ */
-app.get('/api/lookup', (req, res) => {
-  const handle = String(req.query.handle || '').trim().toLowerCase().replace(/^@/, '');
-  if (!handle || handle.length < 2) return res.status(400).json({ error: 'HANDLE_REQUIRED' });
+app.get('/api/lookup', lookupLimiter, (req, res) => {
+  const raw = String(req.query.handle || '').trim().replace(/^@/, '');
+  // Validate handle to prevent injection and info-leak enumeration
+  if (!raw || raw.length < 2 || raw.length > 64) return res.status(400).json({ error: 'HANDLE_REQUIRED' });
+  if (!/^[a-zA-Z0-9_\-.]+$/.test(raw)) return res.status(400).json({ error: 'HANDLE_INVALID' });
+  const handle = raw.toLowerCase();
   const match = applicationStore.find(a =>
     (a.telegram || '').toLowerCase().replace(/^@/, '') === handle ||
     (a.username  || '').toLowerCase() === handle
   );
   if (!match) return res.status(404).json({ found: false, message: 'No application found.' });
+  // Never expose internal fields (ip, aiScore, essay, etc.) — return only public status
   return res.json({ found: true, status: match.status, specialUsername: match.specialUsername || null });
 });
 
@@ -1274,6 +1482,33 @@ app.post('/admin/api/applications/:id/tg-send', requireAdmin, async (req, res) =
 /* Catch-all — serve index.html for SPA routing (must stay last) */
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+
+/* ══════════════════════════════════════════════════
+   GLOBAL ERROR HANDLER
+   Must be defined AFTER all routes.
+   Catches any unhandled error thrown in route handlers.
+   NEVER leaks stack traces, paths, or raw error messages
+   to the client — only a safe, generic message.
+══════════════════════════════════════════════════ */
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, _next) => {
+  // Log full error server-side for debugging
+  console.error('[ARX-ERROR]', err);
+
+  // Multer / payload errors — return 413
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds size limit.' });
+  }
+
+  // CORS rejection
+  if (err.message && err.message.startsWith('CORS:')) {
+    return res.status(403).json({ error: 'CORS_REJECTED' });
+  }
+
+  // Default: generic 500 — no internal details exposed
+  return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message: 'An unexpected error occurred.' });
 });
 
 

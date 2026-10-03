@@ -356,12 +356,7 @@ async function updateStatus(id, newStatus, { acceptBtn, declineBtn } = {}) {
 
     // Update in-memory record immediately
     const app = allApplications.find(a => a.id === id);
-    if (app) {
-      app.status = newStatus;
-      if (data.specialUsername) app.specialUsername = data.specialUsername;
-      if (data.tgSent !== undefined) app.tgSent = data.tgSent;
-      if (data.inviteLink) app.inviteLink = data.inviteLink;
-    }
+    if (app) app.status = newStatus;
 
     // Refresh stat counters from server response (no extra fetch needed)
     if (data.stats) updateStats(data.stats);
@@ -369,11 +364,8 @@ async function updateStatus(id, newStatus, { acceptBtn, declineBtn } = {}) {
     // Re-render cards so badges + button states update
     renderApplications();
 
-    // If the modal is open for this application, refresh its content & status line
-    if (activeModalId === id && app) {
-      renderModalContent(app);
-      syncModalStatus(id);
-    }
+    // If the modal is open for this application, refresh its status line
+    if (activeModalId === id) syncModalStatus(id);
 
   } catch (err) {
     alert(`Failed to update status: ${err.message}`);
@@ -432,7 +424,6 @@ function renderApplications() {
           <div class="card-identity">
             <span class="card-id">#${String(app.id).padStart(4,'0')}</span>
             <span class="card-username">${escapeHtml(app.username)}</span>
-            ${app.specialUsername ? `<span style="font-size:.65rem;color:var(--green);letter-spacing:.08em;font-weight:700">⟦ ${escapeHtml(app.specialUsername)} ⟧</span>` : ''}
           </div>
           <div class="card-badges">
             <span class="badge ${sb.cls}">${sb.text}</span>
@@ -601,97 +592,7 @@ function renderModalContent(app) {
     <div class="modal-essay">
       <p class="modal-essay-label">// SUBMITTED ESSAY <span class="text-dim">(${app.essay.length} chars &middot; ${wc} words)</span></p>
       <div class="modal-essay-body">${escapeHtml(app.essay)}</div>
-    </div>
-
-    <!-- Achievements / Certificates -->
-    <div class="modal-certs">
-      <p class="cert-panel-label">// ACHIEVEMENTS &amp; CREDENTIALS</p>
-      ${Array.isArray(app.certificates) && app.certificates.length > 0
-        ? `<div class="cert-panel-grid">
-            ${app.certificates.map(c => {
-              const isPdf = c.mimeType === 'application/pdf' || (c.originalName || '').toLowerCase().endsWith('.pdf');
-              const previewHtml = isPdf
-                ? `<div class="cert-card-pdf-preview">[PDF]</div>`
-                : `<img class="cert-card-preview" src="${escapeHtml(c.url)}" alt="${escapeHtml(c.originalName)}" />`;
-              const sizeKb = c.size ? `${(c.size / 1024).toFixed(1)} KB` : '';
-              return `
-                <a class="cert-card" href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(c.originalName)}">
-                  ${previewHtml}
-                  <div class="cert-card-info">
-                    <span class="cert-card-name">${escapeHtml(c.originalName || 'Certificate')}</span>
-                    ${sizeKb ? `<span class="cert-card-size">${escapeHtml(sizeKb)}</span>` : ''}
-                  </div>
-                </a>`;
-            }).join('')}
-           </div>`
-        : `<p class="cert-panel-empty">// NO CERTIFICATES ATTACHED</p>`
-      }
-    </div>
-
-    <!-- Callsign & Telegram Welcome Action (if ACCEPTED) -->
-    ${app.status === 'ACCEPTED' ? `
-      <div class="admin-callsign-panel">
-        <span class="admin-callsign-label">// ASSIGNED OPERATIVE CALLSIGN</span>
-        <span class="admin-callsign-value">⟦ ${escapeHtml(app.specialUsername || 'ARX-OP-PENDING')} ⟧</span>
-        <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:.4rem">
-          <button class="btn-tg-send" id="btn-tg-send" data-id="${app.id}">
-            ⚡ SEND TELEGRAM WELCOME
-          </button>
-          <button class="btn-tg-send" id="btn-copy-invite" data-id="${app.id}">
-            📋 COPY INVITE LINK
-          </button>
-        </div>
-        <div id="tg-send-status" class="tg-invite-link-wrap"></div>
-      </div>
-    ` : ''}`;
-
-  // Attach TG button listeners
-  const tgSendBtn = modalContent.querySelector('#btn-tg-send');
-  if (tgSendBtn) {
-    tgSendBtn.addEventListener('click', () => sendTelegramWelcomeMsg(app.id));
-  }
-  const copyInviteBtn = modalContent.querySelector('#btn-copy-invite');
-  if (copyInviteBtn) {
-    copyInviteBtn.addEventListener('click', () => copyTelegramInvite(app.id));
-  }
-}
-
-async function sendTelegramWelcomeMsg(id) {
-  const btn = document.getElementById('btn-tg-send');
-  const statusEl = document.getElementById('tg-send-status');
-  if (btn) btn.disabled = true;
-  if (statusEl) statusEl.innerHTML = '<span style="color:var(--text-dim)">Dispatching Telegram greeting...</span>';
-
-  try {
-    const res = await fetch(`/admin/api/applications/${id}/tg-send`, { method: 'POST' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to dispatch');
-    if (data.ok && data.tgSent) {
-      if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">✔ Telegram welcome dispatched directly to operative.</span>';
-    } else if (data.inviteLink) {
-      if (statusEl) statusEl.innerHTML = `
-        <span style="color:var(--amber)">⚠ Operative has not started bot yet. Deep-link invite:</span>
-        <a href="${escapeHtml(data.inviteLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(data.inviteLink)}</a>`;
-    } else {
-      if (statusEl) statusEl.innerHTML = `<span style="color:var(--amber)">${escapeHtml(data.message || 'Status updated')}</span>`;
-    }
-  } catch (err) {
-    if (statusEl) statusEl.innerHTML = `<span style="color:var(--pink)">✖ ${escapeHtml(err.message)}</span>`;
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-async function copyTelegramInvite(id) {
-  const app = allApplications.find(a => a.id === id);
-  const statusEl = document.getElementById('tg-send-status');
-  const link = app && app.inviteLink ? app.inviteLink : 'https://t.me/ArxITclub_bot';
-  try {
-    await navigator.clipboard.writeText(link);
-    if (statusEl) statusEl.innerHTML = `<span style="color:var(--green)">✔ Link copied to clipboard: ${escapeHtml(link)}</span>`;
-  } catch {
-    if (statusEl) statusEl.innerHTML = `<span style="color:var(--cyan)">Link: ${escapeHtml(link)}</span>`;
-  }
+    </div>`;
 }
 
 /**
