@@ -1,0 +1,847 @@
+[
+  {
+    "fullName": "Caleb Ephrem",
+    "section": "10E",
+    "callsign": "AX-CE-10E-931179"
+  },
+  {
+    "fullName": "Eyosias Mesfin",
+    "section": "10E",
+    "callsign": "AX-EM-10E-124790"
+  },
+  {
+    "fullName": "Nathan Zekarias",
+    "section": "10C",
+    "callsign": "AX-NZ-10C-420924"
+  },
+  {
+    "fullName": "Etsub Adefirs",
+    "section": "10D",
+    "callsign": "AX-EA-10D-158567"
+  },
+  {
+    "fullName": "Mati Tilahun",
+    "section": "10A",
+    "callsign": "AX-MT-10A-824720"
+  },
+  {
+    "fullName": "Kidus Eyob",
+    "section": "10D",
+    "callsign": "AX-KE-10D-195078"
+  },
+  {
+    "fullName": "Bamlaku Sultan",
+    "section": "9C",
+    "callsign": "AX-BS-9C-731435"
+  },
+  {
+    "fullName": "Yonatan Tesfaye",
+    "section": "9B",
+    "callsign": "AX-YT-9B-274032"
+  },
+  {
+    "fullName": "Fitsum Biruk",
+    "section": "10A",
+    "callsign": "AX-FB-10A-851317"
+  },
+  {
+    "fullName": "Nathan Biniyam",
+    "section": "10B",
+    "callsign": "AX-NB-10B-275069"
+  },
+  {
+    "fullName": "Fuaad Teshome",
+    "section": "10D",
+    "callsign": "AX-FT-10D-953215"
+  },
+  {
+    "fullName": "Levi Getachew",
+    "section": "10C",
+    "callsign": "AX-LG-10C-407661"
+  },
+  {
+    "fullName": "Ezra Mulugeta",
+    "section": "10D",
+    "callsign": "AX-EM-10D-988099"
+  },
+  {
+    "fullName": "Yohannes Elias",
+    "section": "10B",
+    "callsign": "AX-YE-10B-318988"
+  },
+  {
+    "fullName": "Fimon Yonas",
+    "section": "10C",
+    "callsign": "AX-FY-10C-362007"
+  },
+  {
+    "fullName": "Alador Seyoum",
+    "section": "10E",
+    "callsign": "AX-AS-10E-177731"
+  },
+  {
+    "fullName": "Leamilak Mintesnot",
+    "section": "9E",
+    "callsign": "AX-LM-9E-332299"
+  },
+  {
+    "fullName": "Yonatan Belete",
+    "section": "10A",
+    "callsign": "AX-YB-10A-250730"
+  },
+  {
+    "fullName": "Abenezer Tesfaye",
+    "section": "10B",
+    "callsign": "AX-AT-10M-832867"
+  },
+  {
+    "fullName": "Gelan Asfaw",
+    "section": "10A",
+    "callsign": "AX-GA-10A-199059"
+  },
+  {
+    "fullName": "Romay Merd",
+    "section": "9E",
+    "callsign": "AX-RM-9E-561630"
+  },
+  {
+    "fullName": "Dagem Esayas",
+    "section": "10C",
+    "callsign": "AX-DE-10C-905093"
+  },
+  {
+    "fullName": "Milki Fisum",
+    "section": "10C",
+    "callsign": "AX-MF-10C-819672"
+  },
+  {
+    "fullName": "Afework Daniel",
+    "section": "9E",
+    "callsign": "AX-AD-9E-666174"
+  },
+  {
+    "fullName": "Yosan Adere",
+    "section": "9E",
+    "callsign": "AX-YA-9E-444770"
+  },
+  {
+    "fullName": "Etsub Addisu",
+    "section": "10C",
+    "callsign": "AX-EA-10C-151430"
+  },
+  {
+    "fullName": "Zerabruk Degene",
+    "section": "10A",
+    "callsign": "AX-ZD-10A-118478"
+  },
+  {
+    "fullName": "Nahom Belayneh",
+    "section": "9E",
+    "callsign": "AX-NB-9E-122760"
+  },
+  {
+    "fullName": "Alazar Lealem",
+    "section": "10E",
+    "callsign": "AX-AL-10E-353747"
+  },
+  {
+    "fullName": "Yohannes Mengist",
+    "section": "10A",
+    "callsign": "AX-YM-10A-888914"
+  },
+  {
+    "fullName": "Hailemariam Tena",
+    "section": "10A",
+    "callsign": "AX-HT-10A-915021"
+  },
+  {
+    "fullName": "Joseph Edom",
+    "section": "9B",
+    "callsign": "AX-JE-9B-138411"
+  },
+  {
+    "fullName": "Yacob Yishak",
+    "section": "9E",
+    "callsign": "AX-YY-9E-698633"
+  },
+  {
+    "fullName": "Kaleb Eyob",
+    "section": "10C",
+    "callsign": "AX-KE-10C-272065"
+  },
+  {
+    "fullName": "Amanuel Jemo",
+    "section": "10C",
+    "callsign": "AX-AJ-10C-398362"
+  },
+  {
+    "fullName": "Amen Kefelegn",
+    "section": "10C",
+    "callsign": "AX-AK-10C-128460"
+  },
+  {
+    "fullName": "Marcon Biruk",
+    "section": "9D",
+    "callsign": "AX-MB-9D-987235"
+  },
+  {
+    "fullName": "Nabiot Sisay",
+    "section": "10D",
+    "callsign": "AX-NS-10D-671565"
+  },
+  {
+    "fullName": "Amanuel Dereje",
+    "section": "9E",
+    "callsign": "AX-AD-9E-942515"
+  },
+  {
+    "fullName": "Ezra Zemene",
+    "section": "10B",
+    "callsign": "AX-EZ-10B-773320"
+  },
+  {
+    "fullName": "Amanuel Haile",
+    "section": "9C",
+    "callsign": "AX-AH-9C-367543"
+  },
+  {
+    "fullName": "Nolawi Petros",
+    "section": "9E",
+    "callsign": "AX-NP-9E-496424"
+  },
+  {
+    "fullName": "Mikiyas Endashaw",
+    "section": "10E",
+    "callsign": "AX-ME-10E-581429"
+  },
+  {
+    "fullName": "Eyob Addisu",
+    "section": "10D",
+    "callsign": "AX-EA-10D-462481"
+  },
+  {
+    "fullName": "Zerubabel Yosef",
+    "section": "10E",
+    "callsign": "AX-ZY-10E-168096"
+  },
+  {
+    "fullName": "Maikon Tariku",
+    "section": "9D",
+    "callsign": "AX-MT-9D-838505"
+  },
+  {
+    "fullName": "Arazach giorgis",
+    "section": "10A",
+    "callsign": "AX-AG-10A-902375"
+  },
+  {
+    "fullName": "Yonatan Tesfaye",
+    "section": "10C",
+    "callsign": "AX-YT-10C-687069"
+  },
+  {
+    "fullName": "Bemen Demeke",
+    "section": "9D",
+    "callsign": "AX-BD-9D-482709"
+  },
+  {
+    "fullName": "Yabsira Berhanu",
+    "section": "9B",
+    "callsign": "AX-YB-9B-375292"
+  },
+  {
+    "fullName": "Amanuel Deresse",
+    "section": "9E",
+    "callsign": "AX-AD-9E-726294"
+  },
+  {
+    "fullName": "Amanuel Merku",
+    "section": "10D",
+    "callsign": "AX-AM-10D-547687"
+  },
+  {
+    "fullName": "Nobel Mulugeta",
+    "section": "9A",
+    "callsign": "AX-NM-9A-766756"
+  },
+  {
+    "fullName": "Yabsira Belete",
+    "section": "10C",
+    "callsign": "AX-YB-10C-461260"
+  },
+  {
+    "fullName": "Dani Adane",
+    "section": "10D",
+    "callsign": "AX-DA-10D-596114"
+  },
+  {
+    "fullName": "Eyob Wondrad",
+    "section": "9C",
+    "callsign": "AX-EW-9C-261450"
+  },
+  {
+    "fullName": "Yared Zenebe",
+    "section": "10D",
+    "callsign": "AX-YZ-10D-659791"
+  },
+  {
+    "fullName": "Nathan Lakew",
+    "section": "9B",
+    "callsign": "AX-NL-9B-199189"
+  },
+  {
+    "fullName": "Barkon Hayaal",
+    "section": "9E",
+    "callsign": "AX-BH-9E-119232"
+  },
+  {
+    "fullName": "Eyosias Bekele",
+    "section": "10D",
+    "callsign": "AX-EB-10D-737343"
+  },
+  {
+    "fullName": "Amanuel Atnafu",
+    "section": "9A",
+    "callsign": "AX-AA-9A-713270"
+  },
+  {
+    "fullName": "Fikru Fegissa",
+    "section": "9C",
+    "callsign": "AX-FF-9C-932046"
+  },
+  {
+    "fullName": "Emanual Dereje",
+    "section": "9A",
+    "callsign": "AX-ED-9A-213206"
+  },
+  {
+    "fullName": "Markonal Yared",
+    "section": "9A",
+    "callsign": "AX-MY-9A-566794"
+  },
+  {
+    "fullName": "Nadi Mikael",
+    "section": "9D",
+    "callsign": "AX-NM-9D-230596"
+  },
+  {
+    "fullName": "Buruk Tilahun",
+    "section": "9A",
+    "callsign": "AX-BT-9A-136645"
+  },
+  {
+    "fullName": "Areyam Tariku",
+    "section": "10B",
+    "callsign": "AX-AT-10B-292242"
+  },
+  {
+    "fullName": "Mabel Gizat",
+    "section": "10D",
+    "callsign": "AX-MG-10D-372048"
+  },
+  {
+    "fullName": "Tebawek Tekenigen",
+    "section": "10E",
+    "callsign": "AX-TT-10E-421118"
+  },
+  {
+    "fullName": "Michael Tatek",
+    "section": "10D",
+    "callsign": "AX-MT-10D-902540"
+  },
+  {
+    "fullName": "Samuel Dereje",
+    "section": "9E",
+    "callsign": "AX-SD-9E-462101"
+  },
+  {
+    "fullName": "Levi Teferi",
+    "section": "10B",
+    "callsign": "AX-LT-10B-839244"
+  },
+  {
+    "fullName": "Amanuel Alayu",
+    "section": "10C",
+    "callsign": "AX-AA-10C-239492"
+  },
+  {
+    "fullName": "Dagim Kassaw",
+    "section": "11B",
+    "callsign": "AX-DK-11B-816806"
+  },
+  {
+    "fullName": "Robel Nigusse",
+    "section": "11B",
+    "callsign": "AX-RN-11B-299990"
+  },
+  {
+    "fullName": "Abenezer Weliyu",
+    "section": "11A",
+    "callsign": "AX-AW-11A-772111"
+  },
+  {
+    "fullName": "Kirubel Demisu",
+    "section": "11C",
+    "callsign": "AX-KD-11C-874236"
+  },
+  {
+    "fullName": "Mikyas Fikadu",
+    "section": "11C",
+    "callsign": "AX-MF-11C-957157"
+  },
+  {
+    "fullName": "Fraol Tadesse",
+    "section": "11A",
+    "callsign": "AX-FT-11A-743983"
+  },
+  {
+    "fullName": "Michael Girma",
+    "section": "11A",
+    "callsign": "AX-MG-11A-967867"
+  },
+  {
+    "fullName": "Binyam Gutema",
+    "section": "11B",
+    "callsign": "AX-BG-11B-826577"
+  },
+  {
+    "fullName": "Erei Girma",
+    "section": "12B",
+    "callsign": "AX-EG-12B-274342"
+  },
+  {
+    "fullName": "Nathan Tumirat",
+    "section": "12C",
+    "callsign": "AX-NT-12C-144935"
+  },
+  {
+    "fullName": "Alula Haile",
+    "section": "12C",
+    "callsign": "AX-AH-12C-902270"
+  },
+  {
+    "fullName": "Abenezer Tegegne",
+    "section": "11A",
+    "callsign": "AX-AT-11A-409476"
+  },
+  {
+    "fullName": "Nolawi Kassa",
+    "section": "11A",
+    "callsign": "AX-NK-11A-788258"
+  },
+  {
+    "fullName": "Amanuel Nebiyat",
+    "section": "12D",
+    "callsign": "AX-AN-12D-850028"
+  },
+  {
+    "fullName": "Mati Tolera",
+    "section": "12D",
+    "callsign": "AX-MT-12D-844711"
+  },
+  {
+    "fullName": "Edomias Tesfaye",
+    "section": "12E",
+    "callsign": "AX-ET-12E-623407"
+  },
+  {
+    "fullName": "Nahom Samson",
+    "section": "12E",
+    "callsign": "AX-NS-12E-815158"
+  },
+  {
+    "fullName": "Essay Medhane",
+    "section": "11E",
+    "callsign": "AX-EM-11E-217947"
+  },
+  {
+    "fullName": "Biruk Mussie",
+    "section": "12D",
+    "callsign": "AX-BM-12D-128200"
+  },
+  {
+    "fullName": "Elnathan Temesgen",
+    "section": "12E",
+    "callsign": "AX-ET-12E-324589"
+  },
+  {
+    "fullName": "Kidu Mohammed",
+    "section": "11C",
+    "callsign": "AX-KM-11C-870272"
+  },
+  {
+    "fullName": "Kirubel Abihom",
+    "section": "11B",
+    "callsign": "AX-KA-11B-106415"
+  },
+  {
+    "fullName": "Adoniyas Tadele",
+    "section": "11C",
+    "callsign": "AX-AT-11C-795892"
+  },
+  {
+    "fullName": "Yonathan Wessen",
+    "section": "11C",
+    "callsign": "AX-YW-11C-953857"
+  },
+  {
+    "fullName": "Daniel Kende",
+    "section": "11B",
+    "callsign": "AX-DK-11B-491110"
+  },
+  {
+    "fullName": "Desbelez Zerabruk",
+    "section": "11C",
+    "callsign": "AX-DZ-11C-782824"
+  },
+  {
+    "fullName": "Dawit Berhan",
+    "section": "11C",
+    "callsign": "AX-DB-11C-584313"
+  },
+  {
+    "fullName": "Eyob Gilla",
+    "section": "11A",
+    "callsign": "AX-EG-11A-416798"
+  },
+  {
+    "fullName": "Yohannes Samuel",
+    "section": "11A",
+    "callsign": "AX-YS-11A-364047"
+  },
+  {
+    "fullName": "Lewi Dereje",
+    "section": "11A",
+    "callsign": "AX-LD-11A-585688"
+  },
+  {
+    "fullName": "Haben Assefa",
+    "section": "11C",
+    "callsign": "AX-HA-11C-742526"
+  },
+  {
+    "fullName": "Kaleb Lito",
+    "section": "11C",
+    "callsign": "AX-KL-11C-926027"
+  },
+  {
+    "fullName": "Yared Fistum",
+    "section": "11C",
+    "callsign": "AX-YF-11C-475817"
+  },
+  {
+    "fullName": "Michael Andre",
+    "section": "11C",
+    "callsign": "AX-MA-11C-428431"
+  },
+  {
+    "fullName": "Hiyob Seahy",
+    "section": "11A",
+    "callsign": "AX-HS-11A-320638"
+  },
+  {
+    "fullName": "Daniel Bihanu",
+    "section": "11C",
+    "callsign": "AX-DB-11C-989293"
+  },
+  {
+    "fullName": "Ahadu Alemayehu",
+    "section": "11D",
+    "callsign": "AX-AA-11D-822185"
+  },
+  {
+    "fullName": "Abihom Melke",
+    "section": "11A",
+    "callsign": "AX-AM-11A-508815"
+  },
+  {
+    "fullName": "Biruk Gelatu",
+    "section": "11A",
+    "callsign": "AX-BG-11A-551344"
+  },
+  {
+    "fullName": "Abemelek Tewdros",
+    "section": "12A",
+    "callsign": "AX-AT-12A-985077"
+  },
+  {
+    "fullName": "Yadel Ashenk",
+    "section": "12D",
+    "callsign": "AX-YA-12D-978062"
+  },
+  {
+    "fullName": "Amanuel Endawok",
+    "section": "12C",
+    "callsign": "AX-AE-12C-532579"
+  },
+  {
+    "fullName": "Dawit Abebe",
+    "section": "12A",
+    "callsign": "AX-DA-12A-371081"
+  },
+  {
+    "fullName": "Natnael Endale",
+    "section": "12A",
+    "callsign": "AX-NE-12A-110736"
+  },
+  {
+    "fullName": "Simon Yare",
+    "section": "11A",
+    "callsign": "AX-SY-11A-904669"
+  },
+  {
+    "fullName": "Abemelek Getasew",
+    "section": "12C",
+    "callsign": "AX-AG-12C-116026"
+  },
+  {
+    "fullName": "Belyel Getachew",
+    "section": "12A",
+    "callsign": "AX-BG-12A-538374"
+  },
+  {
+    "fullName": "Phar Faruk",
+    "section": "12C",
+    "callsign": "AX-PF-12C-390573"
+  },
+  {
+    "fullName": "Abel Alemayehu",
+    "section": "12C",
+    "callsign": "AX-AA-12C-956901"
+  },
+  {
+    "fullName": "Sofonyas Getachew",
+    "section": "12A",
+    "callsign": "AX-SG-12A-216014"
+  },
+  {
+    "fullName": "Mahder Solomon",
+    "section": "11C",
+    "callsign": "AX-MS-11C-818914"
+  },
+  {
+    "fullName": "Abemelek Tewdros",
+    "section": "11A",
+    "callsign": "AX-AT-11A-254528"
+  },
+  {
+    "fullName": "Kaleab Samson",
+    "section": "11B",
+    "callsign": "AX-KS-11B-979154"
+  },
+  {
+    "fullName": "Natnael Haile",
+    "section": "11A",
+    "callsign": "AX-NH-11A-311427"
+  },
+  {
+    "fullName": "Kidus Tafese",
+    "section": "11B",
+    "callsign": "AX-KT-11B-232942"
+  },
+  {
+    "fullName": "Barok Anteneh",
+    "section": "11B",
+    "callsign": "AX-BA-11B-503207"
+  },
+  {
+    "fullName": "Binyam Birhane",
+    "section": "12B",
+    "callsign": "AX-BB-12B-332698"
+  },
+  {
+    "fullName": "Nebiyu Dawit",
+    "section": "11A",
+    "callsign": "AX-ND-11A-652787"
+  },
+  {
+    "fullName": "Kaleb Mulatu",
+    "section": "11B",
+    "callsign": "AX-KM-11B-127196"
+  },
+  {
+    "fullName": "Kaleb Ibshe",
+    "section": "11C",
+    "callsign": "AX-KI-11C-200954"
+  },
+  {
+    "fullName": "Geradalaw Shemeles",
+    "section": "12C",
+    "callsign": "AX-GS-12C-147348"
+  },
+  {
+    "fullName": "Natnael Dawit",
+    "section": "11A",
+    "callsign": "AX-ND-11A-213815"
+  },
+  {
+    "fullName": "Kefe Zemenu",
+    "section": "11A",
+    "callsign": "AX-KZ-11A-542479"
+  },
+  {
+    "fullName": "Tomerat Getachew",
+    "section": "12C",
+    "callsign": "AX-TG-12C-731596"
+  },
+  {
+    "fullName": "Yonatan Solomon",
+    "section": "12A",
+    "callsign": "AX-YS-12A-412379"
+  },
+  {
+    "fullName": "Baniak Desalegn",
+    "section": "12B",
+    "callsign": "AX-BD-12B-937556"
+  },
+  {
+    "fullName": "Nahom Adane",
+    "section": "11D",
+    "callsign": "AX-NA-11D-191558"
+  },
+  {
+    "fullName": "Bisrat Shemeles",
+    "section": "12C",
+    "callsign": "AX-BS-12C-927466"
+  },
+  {
+    "fullName": "Naod Birhane",
+    "section": "12B",
+    "callsign": "AX-NB-12B-381259"
+  },
+  {
+    "fullName": "Kirubel Zymersmer",
+    "section": "11C",
+    "callsign": "AX-KZ-11C-713796"
+  },
+  {
+    "fullName": "Yoas Fikru",
+    "section": "11B",
+    "callsign": "AX-YF-11B-547815"
+  },
+  {
+    "fullName": "Gemat Gorderiew",
+    "section": "12C",
+    "callsign": "AX-GG-12C-897419"
+  },
+  {
+    "fullName": "Kidus Girma",
+    "section": "12C",
+    "callsign": "AX-KG-12C-973787"
+  },
+  {
+    "fullName": "Yoseph Sisay",
+    "section": "11E",
+    "callsign": "AX-YS-11E-265978"
+  },
+  {
+    "fullName": "Eyobed Birhanu",
+    "section": "11B",
+    "callsign": "AX-EB-11B-733826"
+  },
+  {
+    "fullName": "Yafet G/Kiros",
+    "section": "12B",
+    "callsign": "AX-YG-12B-892728"
+  },
+  {
+    "fullName": "Yohannes W/Selassie",
+    "section": "12B",
+    "callsign": "AX-YW-12B-605269"
+  },
+  {
+    "fullName": "Yared Misgnaw",
+    "section": "12A",
+    "callsign": "AX-YM-12A-430370"
+  },
+  {
+    "fullName": "Michael Behailu",
+    "section": "12C",
+    "callsign": "AX-MB-12C-579376"
+  },
+  {
+    "fullName": "Lyoel Levi",
+    "section": "11A",
+    "callsign": "AX-LL-11A-564496"
+  },
+  {
+    "fullName": "Kidus Solomon",
+    "section": "11C",
+    "callsign": "AX-KS-11C-291282"
+  },
+  {
+    "fullName": "Kaleb Kassie",
+    "section": "11B",
+    "callsign": "AX-KK-11B-480490"
+  },
+  {
+    "fullName": "Ambachew Astatkie",
+    "section": "11D",
+    "callsign": "AX-AA-11D-101797"
+  },
+  {
+    "fullName": "Oda Ebbisa",
+    "section": "11D",
+    "callsign": "AX-OE-11D-496148"
+  },
+  {
+    "fullName": "Christan Zelalm",
+    "section": "11E",
+    "callsign": "AX-CZ-11E-243165"
+  },
+  {
+    "fullName": "Naftalem Binyam",
+    "section": "11E",
+    "callsign": "AX-NB-11E-832141"
+  },
+  {
+    "fullName": "Kaleb Yohannes",
+    "section": "11B",
+    "callsign": "AX-KY-11B-507715"
+  },
+  {
+    "fullName": "Nahom Ashenfe",
+    "section": "12E",
+    "callsign": "AX-NA-12E-402049"
+  },
+  {
+    "fullName": "Samuel Solomon",
+    "section": "11E",
+    "callsign": "AX-SS-11E-899545"
+  },
+  {
+    "fullName": "Sofonyas Solomon",
+    "section": "11B",
+    "callsign": "AX-SS-11B-792844"
+  },
+  {
+    "fullName": "Elnathan Mengistu",
+    "section": "11C",
+    "callsign": "AX-EM-11C-572883"
+  },
+  {
+    "fullName": "Nathan Kalewold",
+    "section": "11C",
+    "callsign": "AX-NK-11C-243004"
+  },
+  {
+    "fullName": "Alazar Mulugeta",
+    "section": "11E",
+    "callsign": "AX-AM-11E-980782"
+  },
+  {
+    "fullName": "Lukas Mikiyas",
+    "section": "11C",
+    "callsign": "AX-LM-11C-985606"
+  },
+  {
+    "fullName": "Mehatsion Dejene",
+    "section": "11B",
+    "callsign": "AX-MD-11B-199817"
+  },
+  {
+    "fullName": "Ermias Tikawo",
+    "section": "11B",
+    "callsign": "AX-ET-11B-904609"
+  }
+]

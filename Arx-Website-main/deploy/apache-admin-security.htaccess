@@ -1,0 +1,31 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# ARX COLLECTIVE — APACHE / .HTACCESS ADMIN SECURITY CONFIGURATION
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. Block generic /admin with 404
+# 2. IP Whitelisting for secret admin path with 403 Forbidden
+# ══════════════════════════════════════════════════════════════════════════════
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ── Block generic /admin paths ──
+    RewriteRule ^admin(/.*)?$ - [R=404,L]
+
+    # ── IP Whitelist for Secret Path (/arx-ops-console-7729) ──
+    # If the request is for the secret admin route:
+    RewriteCond %{REQUEST_URI} ^/arx-ops-console-7729 [NC]
+    # Check if the client IP is NOT in the allowed list:
+    RewriteCond %{REMOTE_ADDR} !^127\.0\.0\.1$
+    RewriteCond %{REMOTE_ADDR} !^::1$
+    # Add your static IP addresses here:
+    # RewriteCond %{REMOTE_ADDR} !^198\.51\.100\.25$
+    # RewriteCond %{REMOTE_ADDR} !^203\.0\.113\.50$
+    # Return 403 Forbidden if not matched
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# Apache 2.4+ Require IP directive alternative (within Directory or Location):
+# <Location "/arx-ops-console-7729">
+#     Require ip 127.0.0.1 ::1
+#     # Require ip 198.51.100.25
+# </Location>
