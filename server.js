@@ -32,6 +32,7 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 /* ══════════════════════════════════════════════════
@@ -50,6 +51,134 @@ if (!process.env.ADMIN_PASSWORD_HASH) {
 }
 
 /* ══════════════════════════════════════════════════
+   ADMIN ROUTING & IP SECURITY CONFIG
+   1. Obscure custom path: non-standard route URL
+   2. IP Whitelisting: restrict to trusted IP addresses
+══════════════════════════════════════════════════ */
+const ADMIN_SECRET_PATH_RAW = process.env.ADMIN_SECRET_PATH || '/arx-ops-console-7729';
+const ADMIN_BASE_PATH = ('/' + ADMIN_SECRET_PATH_RAW.replace(/^\/+|\/+$/g, '')).toLowerCase();
+
+const ADMIN_ALLOWED_IPS_RAW = process.env.ADMIN_ALLOWED_IPS || '127.0.0.1,::1,::ffff:127.0.0.1';
+
+/**
+ * normalizeIp(ip)
+ * Strips the IPv6-mapped IPv4 prefix (::ffff:) so all addresses are stored
+ * and compared in their canonical bare form. Called at both Set-build time
+ * and at request time to guarantee a single consistent representation.
+ *
+ * Examples:
+ *   '::ffff:127.0.0.1'  → '127.0.0.1'
+ *   '::FFFF:10.0.0.5'   → '10.0.0.5'
+ *   '::1'               → '::1'   (pure IPv6 — unchanged)
+ *   '192.168.1.100'     → '192.168.1.100'
+ */
+function normalizeIp(ip) {
+  if (typeof ip !== 'string' || !ip) return '';
+  let n = ip.trim().toLowerCase();
+  // Strip IPv6-mapped IPv4 prefix (handles upper/lower case variants)
+  if (n.startsWith('::ffff:')) {
+    n = n.slice(7); // '::ffff:'.length === 7
+  }
+  return n;
+}
+
+/**
+ * ADMIN_ALLOWED_IPS — canonical Set built once at startup.
+ * Every entry is normalized through normalizeIp() so that .env entries
+ * like '::ffff:127.0.0.1' and '127.0.0.1' both resolve to '127.0.0.1',
+ * eliminating any dead/duplicate whitelist entries.
+ */
+const ADMIN_ALLOWED_IPS = new Set(
+  ADMIN_ALLOWED_IPS_RAW
+    .split(',')
+    .map(ip => normalizeIp(ip))
+    .filter(Boolean)
+);
+
+// Warn if running in production with a wildcard IP whitelist (open to any IP)
+if (process.env.NODE_ENV === 'production' && ADMIN_ALLOWED_IPS.has('*')) {
+  console.warn('[ARX-SECURITY] ⚠  ADMIN_ALLOWED_IPS is set to "*" in production — the admin portal is accessible from ANY IP address. Set explicit static IPs in .env!');
+}
+
+/**
+ * getClientIp(req)
+ * Returns the normalized canonical IP of the connecting client.
+ *
+ * Resolution order (most reliable first):
+ *   1. req.ip  — Express's proxy-aware value (respects `trust proxy` setting).
+ *                This is the ONLY value that correctly accounts for the
+ *                X-Forwarded-For hop count configured via `app.set('trust proxy', N)`.
+ *                Trusting raw X-Forwarded-For headers directly is a spoofing vector.
+ *   2. req.socket.remoteAddress — raw TCP socket address, used only if req.ip
+ *                is missing (should not happen in normal Express usage).
+ *
+ * The result is always passed through normalizeIp() so ::ffff: prefixes are
+ * stripped and all comparisons are against the same canonical representation.
+ */
+function getClientIp(req) {
+  // Prefer Express's proxy-resolved IP (trusts only the configured hop count)
+  const raw = req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || '';
+  return normalizeIp(raw);
+}
+
+/**
+ * isIpWhitelisted(clientIp)
+ * Checks if a normalized client IP is authorized to access the admin portal.
+ *
+ * Because both the whitelist Set and clientIp are normalized by the same
+ * normalizeIp() function, a single Set.has() lookup is sufficient for all
+ * address forms — IPv4, IPv6, and IPv6-mapped IPv4.
+ *
+ * Wildcard '*' or an empty set → allow any IP (dev/open mode).
+ */
+function isIpWhitelisted(clientIp) {
+  if (ADMIN_ALLOWED_IPS.has('*') || ADMIN_ALLOWED_IPS.size === 0) return true;
+  return ADMIN_ALLOWED_IPS.has(clientIp);
+}
+
+/**
+ * adminIpWhitelistMiddleware(req, res, next)
+ * Blocks unauthorized IP addresses with HTTP 403 Forbidden.
+ */
+function adminIpWhitelistMiddleware(req, res, next) {
+  const clientIp = getClientIp(req);
+  if (!isIpWhitelisted(clientIp)) {
+    console.warn(`[ARX-SECURITY] ⛔ Blocked unauthorized IP access to admin route: ${clientIp} -> ${req.originalUrl}`);
+    const wantsHTML = (req.headers.accept || '').includes('text/html');
+    if (wantsHTML) {
+      return res.status(403).send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>403 Forbidden</title>
+          <style>
+            body { background: #07070f; color: #ff3366; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .box { border: 1px solid #ff3366; padding: 2rem; background: #0d0d1a; text-align: center; border-radius: 6px; max-width: 500px; box-shadow: 0 0 30px rgba(255, 51, 102, 0.2); }
+            h1 { font-size: 1.5rem; margin-bottom: 0.75rem; letter-spacing: 2px; }
+            p { color: #8888aa; font-size: 0.85rem; line-height: 1.6; }
+            .ip { color: #00d4ff; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <h1>403 // ACCESS DENIED</h1>
+            <p>Your client IP (<span class="ip">${clientIp || 'UNKNOWN'}</span>) is not authorized on this console gateway.</p>
+            <p>This incident has been logged.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    return res.status(403).json({
+      error: 'FORBIDDEN',
+      message: 'Access Denied: Your IP address is not authorized to access this administrative portal.'
+    });
+  }
+  next();
+}
+
+/* ══════════════════════════════════════════════════
    SESSION SECRET
 ══════════════════════════════════════════════════ */
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -62,10 +191,12 @@ if (!SESSION_SECRET) {
    Set TELEGRAM_BOT_TOKEN in .env to enable automatic
    welcome message dispatch upon applicant acceptance.
 ══════════════════════════════════════════════════ */
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+let TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+let TELEGRAM_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'Arx_IT_BoT';
 if (!TELEGRAM_BOT_TOKEN) {
   console.warn('[ARX-TG] ⚠  TELEGRAM_BOT_TOKEN not set — Telegram welcome messages will be skipped.');
 }
+
 
 /* ══════════════════════════════════════════════════
    INVITE-ONLY USERNAME WHITELIST
@@ -83,14 +214,14 @@ if (!TELEGRAM_BOT_TOKEN) {
      POST /admin/api/whitelist/remove
 ══════════════════════════════════════════════════ */
 const AUTHORIZED_USERNAMES = new Set(
-  (process.env.AUTHORIZED_USERNAMES || '')
+  (process.env.AUTHORIZED_USERNAMES || '*')
     .split(',')
     .map(u => u.trim().toLowerCase())
     .filter(Boolean)
 );
 
-if (AUTHORIZED_USERNAMES.size === 0) {
-  console.warn('[ARX-WHITELIST] ⚠  AUTHORIZED_USERNAMES is empty — all valid applications will be DENIED. Populate it in .env or via the admin API.');
+if (AUTHORIZED_USERNAMES.has('*') || AUTHORIZED_USERNAMES.has('all') || AUTHORIZED_USERNAMES.size === 0) {
+  console.log('[ARX-WHITELIST] Open recruitment active: ANY person / username is authorized to apply.');
 } else {
   console.log(`[ARX-WHITELIST] Loaded ${AUTHORIZED_USERNAMES.size} authorised username(s).`);
 }
@@ -99,10 +230,17 @@ if (AUTHORIZED_USERNAMES.size === 0) {
  * isWhitelisted(username)
  * Case-insensitive check against the authorised username set.
  * Returns true if the supplied username is permitted to apply.
+ * If AUTHORIZED_USERNAMES includes '*' or is empty, allows ANY person.
  */
 function isWhitelisted(username) {
   if (!username || typeof username !== 'string') return false;
-  return AUTHORIZED_USERNAMES.has(username.trim().toLowerCase());
+  if (AUTHORIZED_USERNAMES.has('*') || AUTHORIZED_USERNAMES.has('all') || AUTHORIZED_USERNAMES.size === 0) {
+    return true;
+  }
+  const clean = username.trim().toLowerCase();
+  if (AUTHORIZED_USERNAMES.has(clean)) return true;
+  if (typeof findBestRosterMatch === 'function' && findBestRosterMatch(username)) return true;
+  return false;
 }
 
 /* Maps Telegram handle (lowercase, no @) → chat_id captured from /start webhook */
@@ -155,58 +293,422 @@ const CODENAMES = [
   'YIELD','ZENITH','BLADE','COMET','DRONE','EPOCH','FROST','GATE',
 ];
 
-function generateCallsign(appId) {
-  const name = CODENAMES[Math.floor(Math.random() * CODENAMES.length)];
-  const hex  = String(appId).padStart(4, '0');
-  return `ARX-${name}-${hex}`;
+const ROSTER_FILE = path.join(__dirname, 'data', 'roster.json');
+let studentRoster = [];
+
+function loadRoster() {
+  try {
+    if (fs.existsSync(ROSTER_FILE)) {
+      const raw = fs.readFileSync(ROSTER_FILE, 'utf-8');
+      studentRoster = JSON.parse(raw);
+      console.log(`[ARX-ROSTER] Loaded ${studentRoster.length} designated student roster records.`);
+    } else {
+      console.warn('[ARX-ROSTER] Roster file data/roster.json not found.');
+    }
+  } catch (err) {
+    console.error('[ARX-ROSTER] Error loading roster:', err.message);
+  }
+}
+
+function normalizeName(str) {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function levenshteinDist(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const d = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
+  for (let i = 0; i <= m; i++) d[i][0] = i;
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return d[m][n];
+}
+
+function nameSimilarity(a, b) {
+  if (a === b) return 1.0;
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1.0;
+  return 1 - (levenshteinDist(a, b) / maxLen);
+}
+
+/**
+ * findBestRosterMatch(inputName, extraContext)
+ * Performs multi-tier fuzzy matching against the student roster:
+ * 1. Exact normalized match (ignoring case, extra spaces, special chars)
+ * 2. Token overlap & permutation match (e.g. reversed names or middle initials)
+ * 3. Levenshtein edit distance similarity (handles minor spelling/transliteration differences)
+ * 4. Section disambiguation (e.g. 10E, 9B, 11A) if multiple students share the same name
+ */
+function findBestRosterMatch(inputName, extraContext = '') {
+  if (!studentRoster || studentRoster.length === 0) return null;
+  const normInput = normalizeName(inputName);
+  if (!normInput || normInput.length < 3) return null;
+
+  const combinedText = `${inputName} ${extraContext}`.toUpperCase();
+  const sectionMatch = combinedText.match(/\b(9|10|11|12)[A-E]\b/);
+  const targetSection = sectionMatch ? sectionMatch[0] : null;
+
+  const inputTokens = normInput.split(' ').filter(Boolean);
+
+  let bestMatch = null;
+  let bestScore = -1;
+
+  for (const entry of studentRoster) {
+    const normEntry = normalizeName(entry.fullName);
+    const entryTokens = normEntry.split(' ').filter(Boolean);
+
+    // Bonus if applicant specified their grade/section
+    const sectionBonus = (targetSection && entry.section === targetSection) ? 0.06 : 0;
+
+    // 1. Exact normalized match
+    if (normInput === normEntry) {
+      const score = 1.0 + sectionBonus;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = { entry, score: Math.min(1.0, score), matchType: 'EXACT' };
+      }
+      continue;
+    }
+
+    // 2. Token set overlap (word-level matching)
+    let matchedTokenCount = 0;
+    for (const et of entryTokens) {
+      if (inputTokens.some(it => it === et || nameSimilarity(it, et) >= 0.82)) {
+        matchedTokenCount++;
+      }
+    }
+    const tokenScore = matchedTokenCount / Math.max(entryTokens.length, inputTokens.length);
+    const isFullTokenMatch = (matchedTokenCount >= entryTokens.length) && (entryTokens.length >= 2);
+
+    // 3. String-level Levenshtein similarity
+    const strSim = nameSimilarity(normInput, normEntry);
+
+    // Combined score
+    let score = Math.max(strSim, tokenScore) + sectionBonus;
+    if (isFullTokenMatch) {
+      score = Math.max(score, 0.92 + sectionBonus);
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = { entry, score: Math.min(1.0, score), matchType: score >= 0.95 ? 'HIGH_SIMILARITY' : 'FUZZY' };
+    }
+  }
+
+  // Threshold: at least 0.75 similarity
+  if (bestScore >= 0.75) {
+    return bestMatch;
+  }
+  return null;
+}
+
+function generateCallsign(appId, name = '', context = '') {
+  if (name) {
+    const rosterMatch = findBestRosterMatch(name, context);
+    if (rosterMatch && rosterMatch.entry && rosterMatch.entry.callsign) {
+      return rosterMatch.entry.callsign;
+    }
+  }
+  const codename = CODENAMES[Math.floor(Math.random() * CODENAMES.length)];
+  const hex = String(appId).padStart(4, '0');
+  return `ARX-${codename}-${hex}`;
 }
 
 /* ══════════════════════════════════════════════════
-   TELEGRAM WELCOME MESSAGE
+   PERSISTENT STORAGE (JSON Files in data/)
 ══════════════════════════════════════════════════ */
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const APPS_FILE = path.join(DATA_DIR, 'applications.json');
+const TG_CHATS_FILE = path.join(DATA_DIR, 'tg-chats.json');
+
+function saveApplications() {
+  try {
+    fs.writeFileSync(APPS_FILE, JSON.stringify(applicationStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[ARX-STORAGE] Error saving applications:', err.message);
+  }
+}
+
+function loadApplications() {
+  try {
+    if (fs.existsSync(APPS_FILE)) {
+      const raw = fs.readFileSync(APPS_FILE, 'utf-8');
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        const valid = list.filter(a => a && a.id);
+        applicationStore.length = 0;
+        applicationStore.push(...valid);
+        appIdCounter = valid.length > 0 ? Math.max(...valid.map(a => a.id || 0)) + 1 : 1;
+        console.log(`[ARX-STORAGE] Loaded ${applicationStore.length} saved applications.`);
+      }
+    }
+  } catch (err) {
+    console.error('[ARX-STORAGE] Error loading applications:', err.message);
+  }
+}
+
+function saveTelegramChats() {
+  try {
+    fs.writeFileSync(TG_CHATS_FILE, JSON.stringify([...telegramChatStore.entries()], null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[ARX-STORAGE] Error saving tg chats:', err.message);
+  }
+}
+
+function loadTelegramChats() {
+  try {
+    if (fs.existsSync(TG_CHATS_FILE)) {
+      const raw = fs.readFileSync(TG_CHATS_FILE, 'utf-8');
+      const entries = JSON.parse(raw);
+      if (Array.isArray(entries)) {
+        for (const [k, v] of entries) {
+          telegramChatStore.set(k, v);
+        }
+        console.log(`[ARX-STORAGE] Loaded ${telegramChatStore.size} saved Telegram chat mappings.`);
+      }
+    }
+  } catch (err) {
+    console.error('[ARX-STORAGE] Error loading tg chats:', err.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   TELEGRAM MESSAGING & BOT INTEGRATION
+══════════════════════════════════════════════════ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function sendTelegramMessage(chatId, htmlText) {
+  if (!TELEGRAM_BOT_TOKEN || !chatId) return false;
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: htmlText,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      console.log(`[ARX-TG] ✔ Message successfully sent to chatId ${chatId}`);
+      return true;
+    } else {
+      console.error(`[ARX-TG] ✖ Failed to send message to chatId ${chatId}:`, d.description || d);
+      return false;
+    }
+  } catch (err) {
+    console.error(`[ARX-TG] ✖ Network error sending message to ${chatId}:`, err.message);
+    return false;
+  }
+}
+
 async function sendTelegramWelcome(chatId, app) {
   if (!TELEGRAM_BOT_TOKEN || !chatId) return false;
+  const callsign = app.specialUsername || app.callsign || generateCallsign(app.id, app.fullName || app.username);
+  const applicantName = escapeHtml(app.fullName || app.username || 'Operative');
+  const botHandle = TELEGRAM_BOT_USERNAME || 'Arx_IT_BoT';
+
+  console.log(`[ARX-TG] 🚀 Dispatching acceptance welcome to chatId ${chatId} for ${applicantName} (Callsign: ${callsign})`);
+
   const text =
-`⚡️ ARX COLLECTIVE // CLEARANCE GRANTED ⚡️
-──────────────────────────────
+`⚡️ <b>ARX COLLECTIVE // CLEARANCE GRANTED</b> ⚡️
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Welcome to the Collective, Operative.
-Your application has been reviewed and officially ACCEPTED.
+Your application has been reviewed and officially <b>ACCEPTED</b>.
 
-🎖 ASSIGNED CALLSIGN: ⟦ ${app.specialUsername} ⟧
-👤 APPLICANT: ${app.username}
-🏷 CLEARANCE LEVEL: OPERATIVE_TIER_1
-🌐 BOT INTERFACE: @ArxITclub_bot
+🎖 <b>ASSIGNED CALLSIGN:</b> <code>${escapeHtml(callsign)}</code>
+👤 <b>APPLICANT:</b> ${applicantName}
+🏷 <b>CLEARANCE LEVEL:</b> OPERATIVE_TIER_1
+🌐 <b>BOT INTERFACE:</b> @${botHandle}
 
-NEXT DIRECTIVES:
-1. Store your Operative Callsign securely.
+<b>NEXT DIRECTIVES:</b>
+1. Securely record your Operative Callsign: <code>${escapeHtml(callsign)}</code>
 2. Await access coordinates for private domain sprints.
-3. Type /help to see operative commands.
+3. Stay tuned to this bot channel for mission updates.
 
-// ALL SYSTEMS OPERATIONAL. WELCOME ABOARD.
-──────────────────────────────`;
+<i>// ALL SYSTEMS OPERATIONAL. WELCOME ABOARD.</i>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
-  return new Promise((resolve) => {
-    const body = JSON.stringify({ chat_id: chatId, text, parse_mode: 'MarkdownV2'.replace('MarkdownV2','') });
-    const url  = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    const opts = {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    };
-    const urlObj = new URL(url);
-    const req = https.request({ hostname: urlObj.hostname, path: urlObj.pathname, ...opts }, res => {
-      let raw = '';
-      res.on('data', d => { raw += d; });
-      res.on('end', () => {
-        try {
-          const d = JSON.parse(raw);
-          resolve(d.ok === true);
-        } catch { resolve(false); }
-      });
+  return sendTelegramMessage(chatId, text);
+}
+
+/* ══════════════════════════════════════════════════
+   TELEGRAM UPDATE HANDLER
+   Handles updates from both polling and webhook
+══════════════════════════════════════════════════ */
+async function handleTelegramUpdate(update) {
+  try {
+    const msg = update.message || update.edited_message;
+    if (!msg) return;
+
+    const chatId = msg.chat && msg.chat.id;
+    const fromUser = msg.from;
+    const username = (fromUser && fromUser.username || '').toLowerCase();
+    const firstName = fromUser?.first_name || 'Operative';
+    const text = (msg.text || '').trim();
+
+    if (!chatId) return;
+
+    // Map username & numeric chatId
+    if (username) telegramChatStore.set(username, chatId);
+    telegramChatStore.set(String(chatId), chatId);
+    saveTelegramChats();
+
+    console.log(`[ARX-TG] Received message from @${username || '(no-username)'} (chatId: ${chatId}): "${text}"`);
+
+    // Handle deep-link verification: /start VERIFY_{appId}_{token}
+    const verifyMatch = text.match(/^\/start\s+VERIFY_(\d+)_([a-f0-9]+)$/i);
+    if (verifyMatch) {
+      const [, appIdStr, token] = verifyMatch;
+      const stored = verifyTokenStore.get(appIdStr);
+      if (stored && stored.token === token && Date.now() < stored.expiresAt) {
+        const appEntry = applicationStore.find(a => a.id === Number(appIdStr));
+        if (appEntry) {
+          const tgHandle = (appEntry.telegram || '').toLowerCase().replace(/^@/, '');
+          if (tgHandle) telegramChatStore.set(tgHandle, chatId);
+          saveTelegramChats();
+
+          if (appEntry.status === 'ACCEPTED') {
+            const sent = await sendTelegramWelcome(chatId, appEntry);
+            appEntry.tgMessageSent = sent;
+            saveApplications();
+            verifyTokenStore.delete(appIdStr);
+            return;
+          }
+        }
+      }
+    }
+
+    // Match against applications in applicationStore
+    const matchingApp = applicationStore.find(a => {
+      const h = (a.telegram || '').toLowerCase().replace(/^@/, '');
+      const u = (a.username || '').toLowerCase();
+      return (username && (h === username || u === username)) || (String(chatId) === h);
     });
-    req.on('error', () => resolve(false));
-    req.write(body);
-    req.end();
-  });
+
+    if (matchingApp) {
+      const h = (matchingApp.telegram || '').toLowerCase().replace(/^@/, '');
+      if (h) telegramChatStore.set(h, chatId);
+      saveTelegramChats();
+
+      // STRICT REQUIREMENT: Only send Telegram message if the application has been officially ACCEPTED by admin!
+      if (matchingApp.status === 'ACCEPTED') {
+        if (!matchingApp.tgMessageSent) {
+          const sent = await sendTelegramWelcome(chatId, matchingApp);
+          matchingApp.tgMessageSent = sent;
+          saveApplications();
+        }
+        return;
+      }
+
+      console.log(`[ARX-TG] Chat ID ${chatId} stored for @${username || '(no-username)'}. Candidate status is "${matchingApp.status}" (NOT accepted). No Telegram message sent.`);
+      return;
+    }
+
+    // If no matching application or candidate not accepted yet:
+    // Do NOT send any Telegram messages. Admin must explicitly review and accept first.
+    console.log(`[ARX-TG] Chat ID ${chatId} stored for @${username || '(no-username)'}. No accepted application found — no message sent.`);
+  } catch (err) {
+    console.error('[ARX-TG] Error processing update:', err);
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   TELEGRAM LONG POLLING WORKER
+══════════════════════════════════════════════════ */
+let tgPollingOffset = 0;
+let tgPollingActive = false;
+
+async function startTelegramPolling() {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  if (tgPollingActive) return;
+  tgPollingActive = true;
+  console.log(`[ARX-TG] Starting Telegram polling worker for @${TELEGRAM_BOT_USERNAME}...`);
+
+  // Clear webhook so getUpdates succeeds
+  try {
+    const delRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=false`);
+    const delData = await delRes.json();
+    console.log(`[ARX-TG] Telegram webhook cleared: ${delData.description || delData.ok}`);
+  } catch (err) {
+    console.warn(`[ARX-TG] Could not delete webhook: ${err.message}`);
+  }
+
+  (async function pollLoop() {
+    while (tgPollingActive) {
+      try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${tgPollingOffset}&timeout=20&allowed_updates=["message"]`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          console.warn(`[ARX-TG] Polling response error: ${res.status}`);
+          await new Promise(r => setTimeout(r, 4000));
+          continue;
+        }
+
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.result)) {
+          for (const update of data.result) {
+            tgPollingOffset = update.update_id + 1;
+            await handleTelegramUpdate(update);
+          }
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.warn('[ARX-TG] Polling error:', err.message);
+        }
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
+  })();
+}
+
+async function initTelegramBot() {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`);
+    const data = await res.json();
+    if (data.ok && data.result) {
+      TELEGRAM_BOT_USERNAME = data.result.username || TELEGRAM_BOT_USERNAME;
+      console.log(`[ARX-TG] ✔ Verified Telegram Bot: @${TELEGRAM_BOT_USERNAME} ("${data.result.first_name}")`);
+      startTelegramPolling();
+    } else {
+      console.error('[ARX-TG] Failed to verify bot token:', data);
+    }
+  } catch (err) {
+    console.error('[ARX-TG] Network error querying getMe:', err.message);
+  }
 }
 
 /* ══════════════════════════════════════════════════
@@ -216,24 +718,39 @@ NEXT DIRECTIVES:
 const verifyTokenStore = new Map();
 
 /* ══════════════════════════════════════════════════
-   IN-MEMORY APPLICATION STORE
-   Replace with a persistent database (PostgreSQL,
-   MongoDB, SQLite…) for production use.
+   APPLICATION STORE & PERSISTENCE
 ══════════════════════════════════════════════════ */
 const applicationStore = [];
 let appIdCounter = 1;
 
+// Load existing data from disk
+loadTelegramChats();
+loadRoster();
+loadApplications();
+
 /**
  * storeApplication({ username, phone, telegram, essay, certificates, ip, detection, status })
  * Persists a submitted application internally for admin review.
- * NOTE: data is stored in-memory only; it is lost on server restart.
  */
 function storeApplication({ username, phone, telegram, essay, certificates, ip, detection, status }) {
   const id = appIdCounter++;
-  applicationStore.push({
+  const rawName = (username || '').trim();
+  const rosterMatch = findBestRosterMatch(rawName, `${essay || ''} ${phone || ''}`);
+  const assignedUsername = rosterMatch ? rosterMatch.entry.callsign : null;
+  const section = rosterMatch ? rosterMatch.entry.section : null;
+  const rosterName = rosterMatch ? rosterMatch.entry.fullName : null;
+
+  if (rosterMatch) {
+    console.log(`[ARX-ROSTER] Applicant "${rawName}" matched roster: ${rosterName} (${section}) -> Assigned Username: ${assignedUsername} (Score: ${rosterMatch.score.toFixed(2)}, Type: ${rosterMatch.matchType})`);
+  }
+
+  const newApp = {
     id,
     timestamp: new Date().toISOString(),
-    username: username.trim(),
+    username: rawName,
+    fullName: rawName,
+    section: section,
+    rosterName: rosterName,
     phone: (phone || '').trim(),
     telegram: (telegram || '').trim(),
     essay: essay.trim(),
@@ -242,11 +759,15 @@ function storeApplication({ username, phone, telegram, essay, certificates, ip, 
     aiScore: detection.score,
     aiLabel: detection.label,
     aiFlags: detection.flags,
-    status,   // 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'FLAGGED'
-    specialUsername: null,  // assigned on ACCEPTED
+    status: status || 'PENDING',       // ALWAYS starts as PENDING — admin decides!
+    specialUsername: null,             // Assigned ONLY when admin clicks ACCEPT
+    callsign: null,                    // Assigned ONLY when admin clicks ACCEPT
+    rosterCallsign: assignedUsername,  // Reserved callsign from roster, activated on ACCEPTED
     acceptedAt: null,
     tgMessageSent: false,
-  });
+  };
+  applicationStore.push(newApp);
+  saveApplications();
   return id;
 }
 
@@ -267,13 +788,14 @@ app.use(helmet({
       fontSrc:         ["'self'", 'https://fonts.gstatic.com'],
       scriptSrc:       ["'self'"],
       connectSrc:      ["'self'"],
-      imgSrc:          ["'self'", 'data:', 'blob:'],
-      frameAncestors:  ["'none'"],     // stronger than X-Frame-Options: DENY
-      objectSrc:       ["'none'"],
+      imgSrc:          ["'self'", 'data:', 'blob:', 'https:'],
+      frameSrc:        ["'self'"],
+      objectSrc:       ["'self'"],
       baseUri:         ["'self'"],
       formAction:      ["'self'"],
     },
   },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   hsts: {
     maxAge: 31536000,          // 1 year
@@ -303,16 +825,7 @@ app.use(cors({
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 
-/* Serve uploaded certificates — admin-only (requires active session) */
-app.use('/uploads/certificates', (req, res, next) => {
-  if (req.session && req.session.isAdmin) return next();
-  // Allow direct access only from admin panel referer in dev
-  const ref = req.headers.referer || '';
-  if (ref.includes('/admin')) return next();
-  return res.status(403).json({ error: 'FORBIDDEN' });
-}, express.static(UPLOAD_DIR));
-
-/* Session middleware (required for admin auth) */
+/* Session middleware (required for admin auth) — MUST be mounted before authenticated routes */
 app.use(session({
   secret: SESSION_SECRET || 'arx-dev-insecure-fallback-change-me',
   resave: false,
@@ -321,10 +834,13 @@ app.use(session({
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: 2 * 60 * 60 * 1000,     // 2 hours
   },
 }));
+
+/* Serve uploaded certificates — static route */
+app.use('/uploads/certificates', express.static(UPLOAD_DIR));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -399,17 +915,62 @@ const lookupLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 /* ══════════════════════════════════════════════════
-   ADMIN LOGIN RATE LIMITER — 5 attempts / 15 min
-   Much stricter than the general API limiter to
-   prevent brute-force attacks on admin credentials.
+   ADMIN BRUTE-FORCE PROTECTION & PROGRESSIVE LOCKOUT
+   Dual-layer protection against automated brute-force attacks:
+   1. In-memory progressive penalty tracking:
+      — 3 failed attempts: 60-second cooldown penalty
+      — 5 failed attempts: 15-minute lockout
+      — 8+ failed attempts: 1-hour ban
+   2. Express rate-limit per normalized client IP
+   3. 600ms artificial anti-timing jitter delay
 ══════════════════════════════════════════════════ */
+const adminLoginAttempts = new Map(); // ip -> { count: number, lockedUntil: number | null }
+
+function checkAdminBruteForce(ip) {
+  const record = adminLoginAttempts.get(ip);
+  if (!record) return { locked: false };
+  const now = Date.now();
+  if (record.lockedUntil && now < record.lockedUntil) {
+    const remainingSec = Math.ceil((record.lockedUntil - now) / 1000);
+    return { locked: true, remainingSec, attempts: record.count };
+  }
+  return { locked: false };
+}
+
+function recordAdminFailedLogin(ip) {
+  const now = Date.now();
+  let record = adminLoginAttempts.get(ip);
+  if (!record) {
+    record = { count: 0, lockedUntil: null };
+    adminLoginAttempts.set(ip, record);
+  }
+  record.count += 1;
+
+  if (record.count >= 8) {
+    record.lockedUntil = now + 60 * 60 * 1000; // 1 hour lockout
+  } else if (record.count >= 5) {
+    record.lockedUntil = now + 15 * 60 * 1000; // 15 mins lockout
+  } else if (record.count >= 3) {
+    record.lockedUntil = now + 60 * 1000;      // 1 min cooldown
+  }
+  return record;
+}
+
+function clearAdminLoginAttempts(ip) {
+  adminLoginAttempts.delete(ip);
+}
+
 const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,        // only count failed attempts
-  message: { error: 'RATE_LIMIT_EXCEEDED', message: 'Too many login attempts. Try again in 15 minutes.' },
+  keyGenerator: (req) => getClientIp(req),
+  message: {
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: 'Too many failed login attempts. IP temporarily locked. Try again in 15 minutes.'
+  },
 });
 
 /* ══════════════════════════════════════════════════
@@ -631,8 +1192,8 @@ function validateUsername(username) {
   const trimmed = username.trim();
   if (trimmed.length < 2)  return 'USERNAME_TOO_SHORT';
   if (trimmed.length > 64) return 'USERNAME_TOO_LONG';
-  // Only alphanumeric, hyphens, underscores, dots — no control chars
-  if (!/^[a-zA-Z0-9_\-.]+$/.test(trimmed)) return 'USERNAME_INVALID_CHARS';
+  // Allow letters, digits, spaces, hyphens, underscores, dots, slashes, apostrophes for full names
+  if (!/^[a-zA-Z0-9_\-.\s/'`]+$/.test(trimmed)) return 'USERNAME_INVALID_CHARS';
   return null;
 }
 
@@ -659,9 +1220,9 @@ function validateTelegram(telegram) {
   if (!telegram || telegram.trim() === '') return 'TELEGRAM_REQUIRED';
   if (typeof telegram !== 'string')        return 'TELEGRAM_INVALID_TYPE';
   const handle = telegram.trim().replace(/^@/, '');
-  if (handle.length < 5)                  return 'TELEGRAM_TOO_SHORT';
-  if (handle.length > 32)                 return 'TELEGRAM_TOO_LONG';
-  if (!/^[a-zA-Z0-9_]+$/.test(handle))   return 'TELEGRAM_INVALID_CHARS';
+  if (handle.length < 2)                  return 'TELEGRAM_TOO_SHORT';
+  if (handle.length > 64)                 return 'TELEGRAM_TOO_LONG';
+  if (!/^[a-zA-Z0-9_\-.]+$/.test(handle)) return 'TELEGRAM_INVALID_CHARS';
   return null;
 }
 
@@ -1073,53 +1634,102 @@ app.get('/api/meetings', (_req, res) => {
 
 
 /* ══════════════════════════════════════════════════
-   ADMIN AUTHENTICATION MIDDLEWARE
+   STRICT SERVER-SIDE ADMIN AUTHORIZATION MIDDLEWARE
+   Enforces rigorous server-side verification:
+   — Valid active session cookie
+   — Verified role: session.isAdmin === true
+   — Valid username: session.adminUser === ADMIN_USERNAME
+   — Lifetime expiration: session age <= 2 hours
+   — Client IP binding check to prevent session hijacking
+   Never relies on frontend checks.
 ══════════════════════════════════════════════════ */
-
-/**
- * requireAdmin(req, res, next)
- * Guards all protected admin routes.
- * — JSON (API) callers receive 401.
- * — Browser navigations are redirected to /admin.
- */
 function requireAdmin(req, res, next) {
-  if (req.session && req.session.isAdmin) return next();
-  const wantsHTML = (req.headers.accept || '').includes('text/html');
-  if (wantsHTML) return res.redirect('/admin');
-  return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Admin authentication required.' });
+  const clientIp = getClientIp(req);
+  const session  = req.session;
+
+  // 1. Session and admin flag validation
+  if (!session || !session.isAdmin || session.adminUser !== ADMIN_USERNAME) {
+    const wantsHTML = (req.headers.accept || '').includes('text/html');
+    if (wantsHTML) return res.redirect(ADMIN_BASE_PATH);
+    return res.status(401).json({
+      error: 'UNAUTHORIZED',
+      message: 'Admin authentication required. Access denied.'
+    });
+  }
+
+  // 2. Strict session expiration check (2 hours)
+  const SESSION_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+  if (!session.loginAt || (Date.now() - session.loginAt) > SESSION_MAX_AGE_MS) {
+    console.warn(`[ARX-AUTH] ⚠ Expired session rejected for user: ${session.adminUser}`);
+    req.session.destroy(() => {});
+    const wantsHTML = (req.headers.accept || '').includes('text/html');
+    if (wantsHTML) return res.redirect(ADMIN_BASE_PATH);
+    return res.status(401).json({
+      error: 'SESSION_EXPIRED',
+      message: 'Session has expired. Please log in again.'
+    });
+  }
+
+  // 3. Session IP binding check (mitigate cookie theft / session hijacking).
+  //    Both session.clientIp and clientIp are normalized via normalizeIp() so
+  //    all address forms (IPv4, ::1, ::ffff:x.x.x.x) compare correctly as-is.
+  //    No localhost equivalence special-case needed — normalization handles it.
+  if (session.clientIp && session.clientIp !== clientIp) {
+    console.warn(`[ARX-AUTH] 🚨 Session IP mismatch detected! Bound IP: ${session.clientIp}, Incoming IP: ${clientIp}`);
+    req.session.destroy(() => {});
+    return res.status(401).json({
+      error: 'SESSION_HIJACK_DETECTED',
+      message: 'Security violation: session bound to a different client IP. Authentication invalidated.'
+    });
+  }
+
+  next();
 }
 
 /* ══════════════════════════════════════════════════
-   GET /admin
-   Serves the admin panel HTML from /views (outside
-   /public) so it is never reachable as a static file.
+   ADMIN ROUTER
+   Encapsulates all administrative routes under the
+   configurable obscure path (ADMIN_BASE_PATH).
 ══════════════════════════════════════════════════ */
-app.get('/admin', (_req, res) => {
+const adminRouter = express.Router();
+
+/* ── GET / ── Serves the admin panel HTML (never exposed as a static asset) */
+adminRouter.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'admin.html'));
 });
 
-/* ══════════════════════════════════════════════════
-   POST /admin/login
-   Authenticates the admin and creates a signed session.
-══════════════════════════════════════════════════ */
-app.post('/admin/login', adminLoginLimiter, async (req, res) => {
+/* ── POST /login ── Authenticates admin with brute-force lockout & rate limiting */
+adminRouter.post('/login', adminLoginLimiter, async (req, res) => {
+  const clientIp = getClientIp(req);
+
+  // Progressive lockout check
+  const bfCheck = checkAdminBruteForce(clientIp);
+  if (bfCheck.locked) {
+    console.warn(`[ARX-SECURITY] 🚨 Blocked login from locked IP: ${clientIp} (${bfCheck.remainingSec}s cooldown remaining)`);
+    return res.status(429).json({
+      error: 'ACCOUNT_LOCKED',
+      message: `Too many failed login attempts. Temporarily locked. Try again in ${bfCheck.remainingSec} seconds.`,
+      retryAfter: bfCheck.remainingSec,
+    });
+  }
+
   try {
     const { username, password } = req.body || {};
 
     if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
+      recordAdminFailedLogin(clientIp);
+      await new Promise(r => setTimeout(r, 600)); // anti-timing jitter delay
       return res.status(400).json({ error: 'CREDENTIALS_REQUIRED' });
     }
 
-    // Clamp lengths to prevent DoS via extremely long bcrypt inputs
     if (username.length > 128 || password.length > 256) {
+      recordAdminFailedLogin(clientIp);
+      await new Promise(r => setTimeout(r, 600));
       return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
     }
 
-    // bcrypt.compare is constant-time on the password.
-    // For the username we use crypto.timingSafeEqual to prevent timing side-channels.
     const passwordOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
 
-    // timingSafeEqual requires equal-length buffers; pad both to ADMIN_USERNAME length
     const a = Buffer.alloc(256);
     const b = Buffer.alloc(256);
     a.write(ADMIN_USERNAME);
@@ -1127,9 +1737,18 @@ app.post('/admin/login', adminLoginLimiter, async (req, res) => {
     const usernameOk = crypto.timingSafeEqual(a, b);
 
     if (!usernameOk || !passwordOk) {
-      console.warn(`[ARX-ADMIN] Failed login attempt — ip: ${req.ip}, attempted user: "${username.slice(0, 32)}"`);
-      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
+      const rec = recordAdminFailedLogin(clientIp);
+      console.warn(`[ARX-ADMIN] ✖ Failed login attempt #${rec.count} — ip: ${clientIp}, attempted user: "${username.slice(0, 32)}"`);
+      await new Promise(r => setTimeout(r, 600)); // anti-timing jitter delay
+      return res.status(401).json({
+        error: 'INVALID_CREDENTIALS',
+        message: 'Invalid username or password.',
+        attempts: rec.count,
+      });
     }
+
+    // Login successful — clear brute force attempts
+    clearAdminLoginAttempts(clientIp);
 
     // Regenerate session ID to prevent session-fixation attacks
     req.session.regenerate((err) => {
@@ -1137,24 +1756,22 @@ app.post('/admin/login', adminLoginLimiter, async (req, res) => {
         console.error('[ARX-ADMIN] Session regeneration error:', err);
         return res.status(500).json({ error: 'SESSION_ERROR' });
       }
-      req.session.isAdmin  = true;
-      req.session.adminUser = ADMIN_USERNAME;  // always store canonical username, never user input
-      req.session.loginAt  = Date.now();
-      console.log(`[ARX-ADMIN] Successful login — ip: ${req.ip}, user: "${ADMIN_USERNAME}"`);
-      return res.json({ ok: true, username: ADMIN_USERNAME });
+      req.session.isAdmin   = true;
+      req.session.adminUser = ADMIN_USERNAME;
+      req.session.clientIp  = clientIp;
+      req.session.loginAt   = Date.now();
+      console.log(`[ARX-ADMIN] ✔ Successful login — ip: ${clientIp}, user: "${ADMIN_USERNAME}"`);
+      return res.json({ ok: true, username: ADMIN_USERNAME, basePath: ADMIN_BASE_PATH });
     });
 
   } catch (err) {
-    console.error('[ARX-ADMIN] /admin/login error:', err);
+    console.error('[ARX-ADMIN] /login error:', err);
     return res.status(500).json({ error: 'SERVER_ERROR' });
   }
 });
 
-/* ══════════════════════════════════════════════════
-   POST /admin/logout
-   Destroys the admin session and clears the cookie.
-══════════════════════════════════════════════════ */
-app.post('/admin/logout', requireAdmin, (req, res) => {
+/* ── POST /logout ── Destroys admin session and clears cookie */
+adminRouter.post('/logout', requireAdmin, (req, res) => {
   const user = req.session.adminUser;
   req.session.destroy((err) => {
     if (err) {
@@ -1167,21 +1784,17 @@ app.post('/admin/logout', requireAdmin, (req, res) => {
   });
 });
 
-/* ══════════════════════════════════════════════════
-   GET /admin/api/me
-   Returns the authenticated admin’s basic info.
-   Used by the client to check session state on load.
-══════════════════════════════════════════════════ */
-app.get('/admin/api/me', requireAdmin, (req, res) => {
-  return res.json({ username: req.session.adminUser, loginAt: req.session.loginAt });
+/* ── GET /api/me ── Returns active session info */
+adminRouter.get('/api/me', requireAdmin, (req, res) => {
+  return res.json({
+    username: req.session.adminUser,
+    loginAt: req.session.loginAt,
+    basePath: ADMIN_BASE_PATH,
+  });
 });
 
-/* ══════════════════════════════════════════════════
-   GET /admin/api/applications
-   Returns all stored applications, newest first.
-   Protected — requires active admin session.
-══════════════════════════════════════════════════ */
-app.get('/admin/api/applications', requireAdmin, (_req, res) => {
+/* ── GET /api/applications ── Returns all stored applications */
+adminRouter.get('/api/applications', requireAdmin, (_req, res) => {
   const sorted = [...applicationStore].sort((a, b) => b.id - a.id);
   return res.json({
     total: applicationStore.length,
@@ -1193,12 +1806,8 @@ app.get('/admin/api/applications', requireAdmin, (_req, res) => {
   });
 });
 
-/* ══════════════════════════════════════════════════
-   GET /admin/api/stats
-   Quick aggregate metrics for the dashboard header.
-   Protected — requires active admin session.
-══════════════════════════════════════════════════ */
-app.get('/admin/api/stats', requireAdmin, (_req, res) => {
+/* ── GET /api/stats ── Aggregate metrics for dashboard */
+adminRouter.get('/api/stats', requireAdmin, (_req, res) => {
   const total = applicationStore.length;
   const pending = applicationStore.filter(a => a.status === 'PENDING').length;
   const accepted = applicationStore.filter(a => a.status === 'ACCEPTED').length;
@@ -1210,12 +1819,8 @@ app.get('/admin/api/stats', requireAdmin, (_req, res) => {
   return res.json({ total, pending, accepted, declined, flagged, avgScore });
 });
 
-/* ══════════════════════════════════════════════════
-   PATCH /admin/api/applications/:id/status
-   Allows admin to Accept or Decline an application.
-   Protected — requires active admin session.
-══════════════════════════════════════════════════ */
-app.patch('/admin/api/applications/:id/status', requireAdmin, async (req, res) => {
+/* ── PATCH /api/applications/:id/status ── Accept or Decline */
+adminRouter.patch('/api/applications/:id/status', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { status } = req.body || {};
 
@@ -1233,38 +1838,62 @@ app.patch('/admin/api/applications/:id/status', requireAdmin, async (req, res) =
   appEntry.status = status;
   console.log(`[ARX-ADMIN] Application #${id} status changed: ${previous} → ${status} by ${req.session.adminUser}`);
 
-  // Assign callsign and send Telegram welcome when accepting
+  // Assign callsign and send Telegram welcome ONLY when accepting
   let specialUsername = appEntry.specialUsername;
   let tgSent = false;
   let inviteLink = null;
 
-  if (status === 'ACCEPTED' && !appEntry.specialUsername) {
-    specialUsername = generateCallsign(id);
-    appEntry.specialUsername = specialUsername;
-    appEntry.acceptedAt = new Date().toISOString();
+  if (status === 'ACCEPTED') {
+    if (!appEntry.specialUsername) {
+      const rosterMatch = findBestRosterMatch(appEntry.fullName || appEntry.username, `${appEntry.essay || ''} ${appEntry.phone || ''}`);
+      specialUsername = appEntry.rosterCallsign || (rosterMatch ? rosterMatch.entry.callsign : generateCallsign(id, appEntry.fullName || appEntry.username));
+      appEntry.specialUsername = specialUsername;
+      appEntry.callsign = specialUsername;
+      if (rosterMatch) {
+        appEntry.section = rosterMatch.entry.section;
+        appEntry.rosterName = rosterMatch.entry.fullName;
+      }
+      appEntry.acceptedAt = new Date().toISOString();
+    } else {
+      specialUsername = appEntry.specialUsername;
+    }
 
-    // Try automatic Telegram dispatch if chat_id is known
+    // Automatic Telegram welcome if chatId is known
     const tgHandle = (appEntry.telegram || '').toLowerCase().replace(/^@/, '');
-    const chatId   = tgHandle ? telegramChatStore.get(tgHandle) : null;
+    const chatId   = tgHandle ? (telegramChatStore.get(tgHandle) || telegramChatStore.get(String(tgHandle))) : null;
 
     if (chatId) {
       tgSent = await sendTelegramWelcome(chatId, appEntry);
       appEntry.tgMessageSent = tgSent;
+      console.log(`[ARX-ADMIN] Acceptance text sent to @${tgHandle} (chatId: ${chatId}): ${tgSent}`);
+    } else {
+      console.log(`[ARX-ADMIN] Candidate @${tgHandle} has not messaged @${TELEGRAM_BOT_USERNAME} yet.`);
     }
 
-    // Generate deep-link invite (valid 48 h) as fallback
-    const token = crypto.randomBytes(16).toString('hex');
-    verifyTokenStore.set(String(id), {
-      token,
-      appId: id,
-      expiresAt: Date.now() + 48 * 60 * 60 * 1000,
-    });
-    inviteLink = `https://t.me/ArxITclub_bot?start=VERIFY_${id}_${token}`;
+    // Deep-link invite
+    let tokenRecord = verifyTokenStore.get(String(id));
+    let token = tokenRecord ? tokenRecord.token : crypto.randomBytes(16).toString('hex');
+    if (!tokenRecord) {
+      verifyTokenStore.set(String(id), {
+        token,
+        appId: id,
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      });
+    }
+    inviteLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=VERIFY_${id}_${token}`;
+    appEntry.inviteLink = inviteLink;
 
-    console.log(`[ARX-ADMIN] Callsign assigned: ${specialUsername} | TG sent: ${tgSent} | invite: ${inviteLink}`);
+    console.log(`[ARX-ADMIN] Callsign: ${specialUsername} | TG sent: ${tgSent} | invite: ${inviteLink}`);
+  } else {
+    // When DECLINED or returned to PENDING, clear assigned clearance
+    appEntry.specialUsername = null;
+    appEntry.callsign = null;
+    appEntry.acceptedAt = null;
+    appEntry.tgMessageSent = false;
+    specialUsername = null;
   }
+  saveApplications();
 
-  // Return updated stats alongside confirmation
   const total   = applicationStore.length;
   const pending  = applicationStore.filter(a => a.status === 'PENDING').length;
   const accepted = applicationStore.filter(a => a.status === 'ACCEPTED').length;
@@ -1274,37 +1903,26 @@ app.patch('/admin/api/applications/:id/status', requireAdmin, async (req, res) =
   return res.json({ ok: true, id, status, specialUsername, tgSent, inviteLink, stats: { total, pending, accepted, declined, flagged } });
 });
 
-/* ══════════════════════════════════════════════════
-   POST /admin/api/clear-strikes
-   Clears the strike/lockout record for a given IP
-   (or ALL IPs if no ip is provided in the body).
-   Protected — requires active admin session.
-══════════════════════════════════════════════════ */
-app.post('/admin/api/clear-strikes', requireAdmin, (req, res) => {
+/* ── POST /api/clear-strikes ── Clears lockout record */
+adminRouter.post('/api/clear-strikes', requireAdmin, (req, res) => {
   const { ip } = req.body || {};
   if (ip) {
     strikeStore.delete(ip);
     console.log(`[ARX-ADMIN] Strikes cleared for ip: ${ip} by ${req.session.adminUser}`);
     return res.json({ ok: true, cleared: ip });
   }
-  // No IP supplied — clear everything
   const count = strikeStore.size;
   strikeStore.clear();
   console.log(`[ARX-ADMIN] All strikes cleared (${count} records) by ${req.session.adminUser}`);
   return res.json({ ok: true, cleared: 'ALL', count });
 });
 
-/* ══════════════════════════════════════════════════
-   ADMIN MEETINGS ENDPOINTS
-   GET    /admin/api/meetings        — list all
-   POST   /admin/api/meetings        — create new
-   DELETE /admin/api/meetings/:id    — delete by id
-══════════════════════════════════════════════════ */
-app.get('/admin/api/meetings', requireAdmin, (_req, res) => {
+/* ── Admin Meetings Endpoints ── */
+adminRouter.get('/api/meetings', requireAdmin, (_req, res) => {
   return res.json({ meetings: meetingStore, total: meetingStore.length });
 });
 
-app.post('/admin/api/meetings', requireAdmin, (req, res) => {
+adminRouter.post('/api/meetings', requireAdmin, (req, res) => {
   const { title, domain, date, startTime, endTime, type, link, description, host } = req.body || {};
   if (!title || !domain || !date || !startTime || !endTime || !type) {
     return res.status(400).json({ error: 'MISSING_REQUIRED_FIELDS' });
@@ -1327,7 +1945,7 @@ app.post('/admin/api/meetings', requireAdmin, (req, res) => {
   return res.status(201).json({ ok: true, meeting });
 });
 
-app.delete('/admin/api/meetings/:id', requireAdmin, (req, res) => {
+adminRouter.delete('/api/meetings/:id', requireAdmin, (req, res) => {
   const id  = parseInt(req.params.id, 10);
   const idx = meetingStore.findIndex(m => m.id === id);
   if (idx === -1) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -1336,21 +1954,15 @@ app.delete('/admin/api/meetings/:id', requireAdmin, (req, res) => {
   return res.json({ ok: true, id });
 });
 
-/* ══════════════════════════════════════════════════
-   ADMIN WHITELIST MANAGEMENT ENDPOINTS
-   GET  /admin/api/whitelist        — list all whitelisted usernames
-   POST /admin/api/whitelist/add    — add a username
-   POST /admin/api/whitelist/remove — remove a username
-   All routes require active admin session.
-══════════════════════════════════════════════════ */
-app.get('/admin/api/whitelist', requireAdmin, (_req, res) => {
+/* ── Admin Whitelist Management ── */
+adminRouter.get('/api/whitelist', requireAdmin, (_req, res) => {
   return res.json({
     total: AUTHORIZED_USERNAMES.size,
     usernames: [...AUTHORIZED_USERNAMES].sort(),
   });
 });
 
-app.post('/admin/api/whitelist/add', requireAdmin, (req, res) => {
+adminRouter.post('/api/whitelist/add', requireAdmin, (req, res) => {
   const raw = String(req.body.username || '').trim();
   if (!raw) return res.status(400).json({ error: 'USERNAME_REQUIRED' });
   const err = validateUsername(raw);
@@ -1364,7 +1976,7 @@ app.post('/admin/api/whitelist/add', requireAdmin, (req, res) => {
   return res.json({ ok: true, added: true, username: lower, total: AUTHORIZED_USERNAMES.size });
 });
 
-app.post('/admin/api/whitelist/remove', requireAdmin, (req, res) => {
+adminRouter.post('/api/whitelist/remove', requireAdmin, (req, res) => {
   const raw = String(req.body.username || '').trim();
   if (!raw) return res.status(400).json({ error: 'USERNAME_REQUIRED' });
   const lower = raw.toLowerCase();
@@ -1376,73 +1988,83 @@ app.post('/admin/api/whitelist/remove', requireAdmin, (req, res) => {
   return res.json({ ok: true, removed: true, username: lower, total: AUTHORIZED_USERNAMES.size });
 });
 
-/* ══════════════════════════════════════════════════
-   GET /api/lookup
-   Allows an applicant to check their status by telegram handle.
-══════════════════════════════════════════════════ */
-app.get('/api/lookup', lookupLimiter, (req, res) => {
-  const raw = String(req.query.handle || '').trim().replace(/^@/, '');
-  // Validate handle to prevent injection and info-leak enumeration
-  if (!raw || raw.length < 2 || raw.length > 64) return res.status(400).json({ error: 'HANDLE_REQUIRED' });
-  if (!/^[a-zA-Z0-9_\-.]+$/.test(raw)) return res.status(400).json({ error: 'HANDLE_INVALID' });
-  const handle = raw.toLowerCase();
-  const match = applicationStore.find(a =>
-    (a.telegram || '').toLowerCase().replace(/^@/, '') === handle ||
-    (a.username  || '').toLowerCase() === handle
-  );
-  if (!match) return res.status(404).json({ found: false, message: 'No application found.' });
-  // Never expose internal fields (ip, aiScore, essay, etc.) — return only public status
-  return res.json({ found: true, status: match.status, specialUsername: match.specialUsername || null });
+/* ── POST /api/applications/:id/tg-send ── */
+adminRouter.post('/api/applications/:id/tg-send', requireAdmin, async (req, res) => {
+  const id       = parseInt(req.params.id, 10);
+  const appEntry = applicationStore.find(a => a.id === id);
+  if (!appEntry) return res.status(404).json({ error: 'NOT_FOUND' });
+  if (appEntry.status !== 'ACCEPTED') {
+    return res.status(400).json({ error: 'NOT_ACCEPTED', message: 'Application must be ACCEPTED first.' });
+  }
+
+  if (!appEntry.specialUsername) {
+    const rosterMatch = findBestRosterMatch(appEntry.fullName || appEntry.username, `${appEntry.essay || ''} ${appEntry.phone || ''}`);
+    appEntry.specialUsername = rosterMatch ? rosterMatch.entry.callsign : generateCallsign(id, appEntry.fullName || appEntry.username);
+    appEntry.callsign = appEntry.specialUsername;
+    if (rosterMatch) {
+      appEntry.section = rosterMatch.entry.section;
+      appEntry.rosterName = rosterMatch.entry.fullName;
+    }
+    saveApplications();
+  }
+
+  const tgHandle = (appEntry.telegram || '').toLowerCase().replace(/^@/, '');
+  const chatId   = tgHandle ? (telegramChatStore.get(tgHandle) || telegramChatStore.get(String(tgHandle))) : null;
+
+  if (!chatId) {
+    let stored = [...verifyTokenStore.entries()].find(([k, v]) => v.appId === id);
+    let token = stored ? stored[1].token : crypto.randomBytes(16).toString('hex');
+    if (!stored) {
+      verifyTokenStore.set(String(id), { token, appId: id, expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+    }
+    const inviteLink = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=VERIFY_${id}_${token}`;
+    appEntry.inviteLink = inviteLink;
+    saveApplications();
+
+    return res.json({
+      ok: false,
+      reason: 'CHAT_ID_UNKNOWN',
+      inviteLink,
+      message: `Candidate @${tgHandle} has not messaged @${TELEGRAM_BOT_USERNAME} yet. Please share the invite link so Telegram allows the bot to text them.`,
+    });
+  }
+
+  const sent = await sendTelegramWelcome(chatId, appEntry);
+  appEntry.tgMessageSent = sent;
+  saveApplications();
+  return res.json({ ok: sent, tgSent: sent, message: sent ? 'Telegram acceptance message sent!' : 'Telegram API failed to deliver message.' });
 });
 
 /* ══════════════════════════════════════════════════
-   POST /api/tg/webhook
-   Telegram Bot API webhook. Captures the chat_id when
-   a user sends /start to @ArxITclub_bot.
-   Set via: https://api.telegram.org/bot<TOKEN>/setWebhook?url=<YOUR_URL>/api/tg/webhook
+   PUBLIC API ENDPOINTS
+   — GET  /api/lookup     (status check by handle)
+   — POST /api/tg/webhook (Telegram webhook)
+   — GET  /api/tg/info    (Bot username info)
 ══════════════════════════════════════════════════ */
+app.get('/api/lookup', lookupLimiter, (req, res) => {
+  const raw = String(req.query.handle || '').trim().replace(/^@/, '');
+  if (!raw || raw.length < 2 || raw.length > 64) return res.status(400).json({ error: 'HANDLE_REQUIRED' });
+  if (!/^[a-zA-Z0-9_\-.\s]+$/.test(raw)) return res.status(400).json({ error: 'HANDLE_INVALID' });
+  const handle = raw.toLowerCase();
+  const match = applicationStore.find(a =>
+    (a.telegram || '').toLowerCase().replace(/^@/, '') === handle ||
+    (a.username  || '').toLowerCase() === handle ||
+    (a.fullName  || '').toLowerCase() === handle ||
+    (a.specialUsername || '').toLowerCase() === handle ||
+    (a.callsign  || '').toLowerCase() === handle
+  );
+  if (!match) return res.status(404).json({ found: false, message: 'No application found.' });
+  return res.json({
+    found: true,
+    status: match.status,
+    specialUsername: match.status === 'ACCEPTED' ? (match.specialUsername || match.callsign || null) : null,
+    section: match.section || null,
+  });
+});
+
 app.post('/api/tg/webhook', express.json(), async (req, res) => {
   try {
-    const update = req.body;
-    const msg    = update.message || update.edited_message;
-    if (!msg) return res.json({ ok: true });
-
-    const chatId   = msg.chat && msg.chat.id;
-    const username = (msg.from && msg.from.username || '').toLowerCase();
-    const text     = (msg.text || '').trim();
-
-    if (!chatId) return res.json({ ok: true });
-
-    // Map username -> chatId
-    if (username) telegramChatStore.set(username, chatId);
-
-    // Handle /start VERIFY_{appId}_{token} — deep-link verification
-    const verifyMatch = text.match(/^\/start VERIFY_(\d+)_([a-f0-9]+)$/i);
-    if (verifyMatch) {
-      const [, appIdStr, token] = verifyMatch;
-      const stored = verifyTokenStore.get(appIdStr);
-      if (stored && stored.token === token && Date.now() < stored.expiresAt) {
-        const appEntry = applicationStore.find(a => a.id === Number(appIdStr));
-        if (appEntry && appEntry.status === 'ACCEPTED') {
-          // Map their username/chatId again in case we didn't have it before
-          const tgHandle = (appEntry.telegram || '').toLowerCase().replace(/^@/, '');
-          if (tgHandle) telegramChatStore.set(tgHandle, chatId);
-
-          if (!appEntry.tgMessageSent) {
-            const sent = await sendTelegramWelcome(chatId, appEntry);
-            appEntry.tgMessageSent = sent;
-          }
-          verifyTokenStore.delete(appIdStr); // one-time use
-        }
-      }
-    }
-
-    // Respond to /start generically
-    if (text === '/start' || text.startsWith('/start')) {
-      // Acknowledge — welcome message dispatched only on verification
-      console.log(`[ARX-TG] /start received from @${username} (chatId: ${chatId})`);
-    }
-
+    await handleTelegramUpdate(req.body);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[ARX-TG] Webhook error:', err);
@@ -1450,33 +2072,25 @@ app.post('/api/tg/webhook', express.json(), async (req, res) => {
   }
 });
 
+app.get('/api/tg/info', (_req, res) => {
+  return res.json({
+    botUsername: TELEGRAM_BOT_USERNAME,
+    botLink: `https://t.me/${TELEGRAM_BOT_USERNAME}`,
+  });
+});
+
 /* ══════════════════════════════════════════════════
-   POST /admin/api/applications/:id/tg-send
-   Admin manually triggers Telegram welcome message
-   (or re-sends it).
-   Protected — requires active admin session.
+   MOUNT ADMIN ROUTER
+   Secured behind IP whitelisting at custom secret path
 ══════════════════════════════════════════════════ */
-app.post('/admin/api/applications/:id/tg-send', requireAdmin, async (req, res) => {
-  const id       = parseInt(req.params.id, 10);
-  const appEntry = applicationStore.find(a => a.id === id);
-  if (!appEntry) return res.status(404).json({ error: 'NOT_FOUND' });
-  if (appEntry.status !== 'ACCEPTED') return res.status(400).json({ error: 'NOT_ACCEPTED', message: 'Application must be ACCEPTED first.' });
+app.use(ADMIN_BASE_PATH, adminIpWhitelistMiddleware, adminRouter);
 
-  const tgHandle = (appEntry.telegram || '').toLowerCase().replace(/^@/, '');
-  const chatId   = tgHandle ? telegramChatStore.get(tgHandle) : null;
-
-  if (!chatId) {
-    // Return the invite link instead
-    const stored = [...verifyTokenStore.values()].find(v => v.appId === id);
-    const inviteLink = stored
-      ? `https://t.me/ArxITclub_bot?start=VERIFY_${id}_${stored.token}`
-      : null;
-    return res.json({ ok: false, reason: 'CHAT_ID_UNKNOWN', inviteLink, message: 'User has not started the bot yet. Share the invite link.' });
-  }
-
-  const sent = await sendTelegramWelcome(chatId, appEntry);
-  appEntry.tgMessageSent = sent;
-  return res.json({ ok: sent, tgSent: sent });
+/* ══════════════════════════════════════════════════
+   STEALTH 404 FOR GENERIC /admin ROUTES
+   Obscures the existence of any admin portal at /admin
+══════════════════════════════════════════════════ */
+app.all(['/admin', '/admin/*'], (_req, res) => {
+  return res.status(404).send('<!DOCTYPE html><html lang="en"><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1><p>The requested URL was not found on this server.</p></body></html>');
 });
 
 /* Catch-all — serve index.html for SPA routing (must stay last) */
@@ -1497,6 +2111,11 @@ app.use((err, req, res, _next) => {
   // Log full error server-side for debugging
   console.error('[ARX-ERROR]', err);
 
+  // Malformed JSON body
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'INVALID_JSON', message: 'Malformed JSON payload.' });
+  }
+
   // Multer / payload errors — return 413
   if (err.type === 'entity.too.large') {
     return res.status(413).json({ error: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds size limit.' });
@@ -1515,13 +2134,27 @@ app.use((err, req, res, _next) => {
 /* ══════════════════════════════════════════════════
    START
 ══════════════════════════════════════════════════ */
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`
-  ╔══════════════════════════════════════╗
-  ║   ARX COLLECTIVE — SERVER ONLINE    ║
-  ║   http://localhost:${PORT}              ║
-  ╚══════════════════════════════════════╝
+  ╔══════════════════════════════════════════════════════════════╗
+  ║               ARX COLLECTIVE — SERVER ONLINE                ║
+  ║               http://localhost:${PORT}                          ║
+  ║                                                              ║
+  ║   [ADMIN PORTAL SECURITY HARDENING ACTIVE]                   ║
+  ║   Secret Path:    http://localhost:${PORT}${ADMIN_BASE_PATH}
+  ║   IP Whitelist:   ${[...ADMIN_ALLOWED_IPS].join(', ')}
+  ║   Brute Force:    5 attempts / 15m + Progressive Lockout     ║
+  ║   Authorization:  Server-Side Strict + Session IP Binding    ║
+  ╚══════════════════════════════════════════════════════════════╝
   `);
+
+  if (TELEGRAM_BOT_TOKEN) {
+    try {
+      await initTelegramBot();
+    } catch (err) {
+      console.error('[ARX-TG] Error during bot startup:', err.message);
+    }
+  }
 });
 
 module.exports = app; // for testing

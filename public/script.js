@@ -425,7 +425,16 @@ function flashError(el) {
 /* ════════════════════════════════════════════════════
    TELEGRAM ACCEPTANCE REDIRECT
 ════════════════════════════════════════════════════ */
-const ARX_TG_BOT = 'https://t.me/ArxITclub_bot';
+let ARX_TG_BOT = 'https://t.me/Arx_IT_BoT';
+let ARX_BOT_NAME = 'Arx_IT_BoT';
+
+// Fetch dynamic bot info if available
+fetch(`${API_BASE}/api/tg/info`).then(r => r.json()).then(d => {
+  if (d && d.botUsername) {
+    ARX_BOT_NAME = d.botUsername;
+    ARX_TG_BOT = d.botLink || `https://t.me/${d.botUsername}`;
+  }
+}).catch(() => {});
 
 function showAcceptanceRedirect(specialUsername) {
   if (formEl)         formEl.hidden         = true;
@@ -484,7 +493,7 @@ if (statusLookupForm) {
           lookupResultEl.innerHTML =
             `<div class="lookup-accepted">✓ Status: <strong class="c-green">ACCEPTED</strong>
              ${callsignBlock}
-             <a href="${ARX_TG_BOT}" target="_blank" rel="noopener noreferrer" class="btn mt-2" style="display:block;text-align:center">📱 OPEN @ArxITclub_bot</a></div>`;
+             <a href="${ARX_TG_BOT}" target="_blank" rel="noopener noreferrer" class="btn mt-2" style="display:block;text-align:center">📱 OPEN @${ARX_BOT_NAME}</a></div>`;
           setTimeout(() => window.open(ARX_TG_BOT, '_blank', 'noopener,noreferrer'), 1500);
         } else {
           const labels = { PENDING: 'PENDING REVIEW', DECLINED: 'DECLINED', FLAGGED: 'FLAGGED', PENDING_REVIEW: 'PENDING REVIEW' };
@@ -548,13 +557,13 @@ formEl.addEventListener('submit', async e => {
 
   if (telegramEl) {
     const tgHandle = telegram.replace(/^@/, '');
-    if (!tgHandle || tgHandle.length < 5) {
-      showAlert('ERR: TELEGRAM_INVALID — handle must be at least 5 characters');
+    if (!tgHandle || tgHandle.length < 2) {
+      showAlert('ERR: TELEGRAM_INVALID — handle must be at least 2 characters');
       flashError(telegramEl);
       return;
     }
-    if (!/^[a-zA-Z0-9_]+$/.test(tgHandle)) {
-      showAlert('ERR: TELEGRAM_INVALID_CHARS — only letters, digits, and underscores allowed');
+    if (!/^[a-zA-Z0-9_\-.]+$/.test(tgHandle)) {
+      showAlert('ERR: TELEGRAM_INVALID_CHARS — invalid characters in handle');
       flashError(telegramEl);
       return;
     }
