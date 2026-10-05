@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&family=Orbitron:wght@400;700;900&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700;800&family=Orbitron:wght@400;700;900&display=swap"
     rel="stylesheet" />
 
   <link rel="stylesheet" href="style.css" />
@@ -531,6 +531,18 @@
                     will receive an invite to the private onboarding channel.<br><br>
                     <strong class="c-cyan">// Stay curious. Keep building.</strong>
                   </p>
+                  <div
+                    style="margin-top:1rem;padding:.8rem;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:3px">
+                    <p style="font-size:.65rem;color:var(--cyan);font-weight:700">// TELEGRAM DISPATCH ACTIVATION</p>
+                    <p style="font-size:.62rem;color:var(--text);margin-top:.3rem">
+                      To receive your acceptance notification and Operative Callsign directly on Telegram, start our
+                      bot:
+                    </p>
+                    <a href="https://t.me/Arx_IT_BoT" target="_blank" rel="noopener noreferrer"
+                      class="btn btn-full mt-2" style="font-size:.65rem;text-align:center">
+                      📱 START @Arx_IT_BoT ON TELEGRAM
+                    </a>
+                  </div>
                 </div>
 
                 <!-- Acceptance panel with Telegram redirect -->
@@ -547,11 +559,11 @@
                     <p class="callsign-value" id="callsign-value">—</p>
                   </div>
                   <div class="tg-redirect-countdown" id="tg-countdown" aria-live="polite">
-                    Redirecting to <strong>@ArxITclub_bot</strong> in <span id="tg-count-num">3</span>s&hellip;
+                    Redirecting to <strong>@Arx_IT_BoT</strong> in <span id="tg-count-num">3</span>s&hellip;
                   </div>
-                  <a id="tg-redirect-btn" class="btn btn-full mt-2" href="https://t.me/ArxITclub_bot" target="_blank"
+                  <a id="tg-redirect-btn" class="btn btn-full mt-2" href="https://t.me/Arx_IT_BoT" target="_blank"
                     rel="noopener noreferrer" aria-label="Open ARX Telegram bot">
-                    📱 OPEN @ArxITclub_bot
+                    📱 OPEN @Arx_IT_BoT
                   </a>
                 </div>
 
@@ -577,7 +589,7 @@
                       FULL NAME <span class="req-star" aria-label="required">*</span>
                     </label>
                     <input class="form-input" type="text" id="f-username" name="username"
-                      placeholder="e.g., techbuilder99" maxlength="32" autocomplete="off" spellcheck="false" required />
+                      placeholder="e.g., Caleb Ephrem" maxlength="64" autocomplete="off" spellcheck="false" required />
                   </div>
 
                   <div class="form-group">
@@ -618,27 +630,33 @@
 
                   <!-- ── ACHIEVEMENTS / CERTIFICATES ── -->
                   <div class="form-group" id="achievements-section">
-                    <p class="cert-section-label">// SECTION_04: PROOF OF WORK &amp; CERTIFICATIONS <span style="color:var(--text-dim)">(OPTIONAL)</span></p>
-                    <div class="cert-dropzone" id="cert-dropzone" tabindex="0" role="button" aria-label="Upload certificates and credentials">
+                    <p class="cert-section-label">// SECTION_04: Any experince with CS add your CERTIFICATIONS
+                      <span style="color:var(--text-dim)">(OPTIONAL)</span>
+                    </p>
+                    <div class="cert-dropzone" id="cert-dropzone" tabindex="0" role="button"
+                      aria-label="Upload certificates and credentials">
                       <div class="cert-dropzone-inner">
                         <div class="cert-dropzone-icon" aria-hidden="true">
                           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
                           </svg>
                         </div>
                         <p class="cert-dropzone-text">DRAG &amp; DROP CREDENTIALS HERE</p>
-                        <p class="cert-dropzone-sub">JPEG · PNG · WebP · PDF &nbsp;·&nbsp; max 5 MB each &nbsp;·&nbsp; up to 3 files</p>
+                        <p class="cert-dropzone-sub">JPEG · PNG · WebP · PDF &nbsp;·&nbsp; max 5 MB each &nbsp;·&nbsp;
+                          up to 3 files</p>
                         <label class="btn cert-upload-btn" for="cert-file-input" id="cert-upload-label">
                           ⊕ UPLOAD CREDENTIALS / CERTIFICATES
                         </label>
-                        <input type="file" id="cert-file-input" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
-                          multiple aria-label="Upload certificate files" hidden />
+                        <input type="file" id="cert-file-input"
+                          accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" multiple
+                          aria-label="Upload certificate files" hidden />
                       </div>
                     </div>
-                    <div id="cert-file-list" class="cert-file-list" aria-label="Staged certificate files" aria-live="polite"></div>
+                    <div id="cert-file-list" class="cert-file-list" aria-label="Staged certificate files"
+                      aria-live="polite"></div>
                     <p class="cert-limit-note" id="cert-limit-note" aria-live="polite"></p>
                   </div>
 

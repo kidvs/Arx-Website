@@ -14,6 +14,8 @@
 
 'use strict';
 
+const ADMIN_BASE = (window.ADMIN_BASE || window.location.pathname.replace(/\/+$/, '') || '/admin');
+
 /* ─────────────────────────────────────────────────
    DOM REFERENCES
 ───────────────────────────────────────────────── */
@@ -82,7 +84,7 @@ if (tabApplications && tabMeetings) {
 ───────────────────────────────────────────────── */
 async function init() {
   try {
-    const res = await fetch('/admin/api/me');
+    const res = await fetch(`${ADMIN_BASE}/api/me`);
     if (res.ok) {
       const data = await res.json();
       adminUserEl.textContent = data.username;
@@ -126,7 +128,7 @@ loginForm.addEventListener('submit', async (e) => {
   loginBtn.textContent = '// AUTHENTICATING...';
 
   try {
-    const res = await fetch('/admin/login', {
+    const res = await fetch(`${ADMIN_BASE}/login`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ username, password }),
@@ -158,7 +160,7 @@ loginForm.addEventListener('submit', async (e) => {
    LOGOUT
 ───────────────────────────────────────────────── */
 logoutBtn.addEventListener('click', async () => {
-  await fetch('/admin/logout', { method: 'POST' });
+  await fetch(`${ADMIN_BASE}/logout`, { method: 'POST' });
   allApplications = [];
   activeModalId = null;
   clearInterval(sessionTimerInterval);
@@ -187,7 +189,7 @@ function startSessionTimer() {
 async function loadApplications() {
   appsGrid.innerHTML = '<div class="loading-state"><span class="spinner"></span> LOADING DATA...</div>';
   try {
-    const res = await fetch('/admin/api/applications');
+    const res = await fetch(`${ADMIN_BASE}/api/applications`);
     if (res.status === 401) { showLogin(); return; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -266,10 +268,15 @@ function getFilteredApps() {
   if (query) {
     apps = apps.filter(a =>
       a.username.toLowerCase().includes(query) ||
+      (a.fullName && a.fullName.toLowerCase().includes(query)) ||
+      (a.specialUsername && a.specialUsername.toLowerCase().includes(query)) ||
+      (a.section && a.section.toLowerCase().includes(query)) ||
+      (a.rosterName && a.rosterName.toLowerCase().includes(query)) ||
       a.essay.toLowerCase().includes(query)    ||
       a.aiLabel.toLowerCase().includes(query)  ||
       (a.phone    || '').toLowerCase().includes(query) ||
-      (a.telegram || '').toLowerCase().includes(query)
+      (a.telegram || '').toLowerCase().includes(query) ||
+      String(a.id).includes(query)
     );
   }
 
@@ -326,6 +333,13 @@ function formatDate(ts) {
   });
 }
 
+function formatFileSize(bytes) {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g,  '&amp;')
@@ -343,7 +357,7 @@ async function updateStatus(id, newStatus, { acceptBtn, declineBtn } = {}) {
   if (declineBtn) declineBtn.disabled = true;
 
   try {
-    const res = await fetch(`/admin/api/applications/${id}/status`, {
+    const res = await fetch(`${ADMIN_BASE}/api/applications/${id}/status`, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ status: newStatus }),
@@ -415,15 +429,59 @@ function renderApplications() {
 
     // Telegram contact CTA (only when accepted)
     const tgBtn = isAcc && tgHandle
-      ? `<a class="btn-tg-contact" href="https://t.me/${escapeHtml(tgHandle)}" target="_blank" rel="noopener noreferrer">\ud83d\udcf1 CONTACT ${escapeHtml(app.telegram)} via Telegram</a>`
+      ? `<a class="btn-tg-contact" href="https://t.me/${escapeHtml(tgHandle)}" target="_blank" rel="noopener noreferrer">📱 CANDIDATE PROFILE (@${escapeHtml(tgHandle)})</a>`
       : '';
+
+    // Telegram bot dispatch status row (when accepted)
+    let tgBox = '';
+    if (isAcc) {
+      if (app.tgMessageSent) {
+        tgBox = `
+          <div class="card-tg-box sent">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span>✔ Acceptance text sent via @Arx_IT_BoT</span>
+              <button class="btn-tg-resend" data-action="tg-send" data-id="${app.id}">📱 Re-send</button>
+            </div>
+          </div>`;
+      } else {
+        const invLink = app.inviteLink || (tgHandle ? `https://t.me/Arx_IT_BoT` : '');
+        tgBox = `
+          <div class="card-tg-box pending">
+            <span>⏳ Bot Text Pending: candidate has not messaged @Arx_IT_BoT</span>
+            <div class="card-tg-actions">
+              <button class="btn-tg-resend" data-action="tg-send" data-id="${app.id}">📱 Text via Bot</button>
+              ${invLink ? `<button class="btn-tg-copy" data-action="tg-copy-link" data-link="${escapeHtml(invLink)}">📋 Copy Bot Link</button>` : ''}
+            </div>
+          </div>`;
+      }
+    }
+
+    // Certificates preview strip on card
+    let certsStrip = '';
+    if (app.certificates && app.certificates.length > 0) {
+      const items = app.certificates.map(c => {
+        const isPdf = c.mimeType === 'application/pdf' || (c.fileName && c.fileName.toLowerCase().endsWith('.pdf'));
+        const thumb = isPdf
+          ? `<span style="color:var(--pink);font-size:.62rem;font-weight:900">📄 PDF</span>`
+          : `<img class="card-cert-thumb" src="${escapeHtml(c.url)}" alt="${escapeHtml(c.originalName)}" />`;
+        return `<a class="card-cert-item" href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" title="Click to open ${escapeHtml(c.originalName)}">${thumb}<span>${escapeHtml(c.originalName)}</span></a>`;
+      }).join('');
+      certsStrip = `
+        <div class="card-certs-row">
+          <div class="card-certs-header">
+            <span>📎 CERTIFICATES &amp; FILES (${app.certificates.length})</span>
+          </div>
+          <div class="card-certs-list">${items}</div>
+        </div>`;
+    }
 
     return `
       <article class="app-card" data-id="${app.id}">
         <header class="card-header">
           <div class="card-identity">
             <span class="card-id">#${String(app.id).padStart(4,'0')}</span>
-            <span class="card-username">${escapeHtml(app.username)}</span>
+            <span class="card-username">${escapeHtml(app.fullName || app.username)}</span>
+            ${app.specialUsername ? `<span class="badge" style="font-family:var(--font-mono);font-size:0.75rem;background:rgba(0,255,136,0.12);color:var(--green);border:1px solid rgba(0,255,136,0.3);padding:2px 6px;border-radius:4px" title="Assigned Callsign">${escapeHtml(app.specialUsername)}${app.section ? ` · ${escapeHtml(app.section)}` : ''}</span>` : ''}
           </div>
           <div class="card-badges">
             <span class="badge ${sb.cls}">${sb.text}</span>
@@ -432,6 +490,7 @@ function renderApplications() {
         </header>
 
         ${contactRow}
+        ${certsStrip}
 
         <div class="card-ai-block">
           <div class="card-ai-header">
@@ -453,7 +512,7 @@ function renderApplications() {
         <footer class="card-footer">
           <span class="card-time">${formatDate(app.timestamp)}</span>
           <button class="btn-view" data-action="open-modal" data-id="${app.id}">
-            READ FULL ESSAY \u2192
+            READ FULL ESSAY →
           </button>
         </footer>
 
@@ -464,15 +523,16 @@ function renderApplications() {
             data-id="${app.id}"
             ${isAcc ? 'disabled' : ''}
             title="${isAcc ? 'Already accepted' : 'Accept this application'}"
-          >${isAcc ? '\u2714 ACCEPTED' : '\u2714 ACCEPT'}</button>
+          >${isAcc ? '✔ ACCEPTED' : '✔ ACCEPT'}</button>
           <button
             class="btn-decline"
             data-action="decline"
             data-id="${app.id}"
             ${isDec ? 'disabled' : ''}
             title="${isDec ? 'Already declined' : 'Decline this application'}"
-          >${isDec ? '\u2716 DECLINED' : '\u2716 DECLINE'}</button>
+          >${isDec ? '✖ DECLINED' : '✖ DECLINE'}</button>
         </div>
+        ${tgBox}
         ${tgBtn}
       </article>`;
   }).join('');
@@ -483,7 +543,7 @@ function renderApplications() {
    Handles all button clicks inside #apps-grid
    without relying on inline onclick handlers.
 ───────────────────────────────────────────────── */
-appsGrid.addEventListener('click', (e) => {
+appsGrid.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn || btn.disabled) return;
 
@@ -501,6 +561,51 @@ appsGrid.addEventListener('click', (e) => {
     const acceptBtn  = card ? card.querySelector('[data-action="accept"]')  : null;
     const declineBtn = card ? card.querySelector('[data-action="decline"]') : null;
     updateStatus(id, newStatus, { acceptBtn, declineBtn });
+    return;
+  }
+
+  if (action === 'tg-send') {
+    btn.disabled = true;
+    const prevText = btn.textContent;
+    btn.textContent = '...SENDING';
+    try {
+      const res = await fetch(`${ADMIN_BASE}/api/applications/${id}/tg-send`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        alert('✔ Acceptance message successfully texted to candidate on Telegram!');
+        const app = allApplications.find(a => a.id === id);
+        if (app) app.tgMessageSent = true;
+        renderApplications();
+      } else {
+        if (data.reason === 'CHAT_ID_UNKNOWN') {
+          const invMsg = data.inviteLink ? `\n\nDirect bot invite link:\n${data.inviteLink}\n(Link copied to clipboard)` : '';
+          if (data.inviteLink) navigator.clipboard.writeText(data.inviteLink).catch(() => {});
+          alert(`Candidate has not messaged @Arx_IT_BoT yet.\nTelegram requires users to message the bot first so Telegram allows it to text them.${invMsg}`);
+        } else {
+          alert('Failed to send Telegram message: ' + (data.message || data.error));
+        }
+      }
+    } catch (err) {
+      alert('Error contacting server: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevText;
+    }
+    return;
+  }
+
+  if (action === 'tg-copy-link') {
+    const link = btn.dataset.link;
+    if (link) {
+      navigator.clipboard.writeText(link).then(() => {
+        const prev = btn.textContent;
+        btn.textContent = '✔ COPIED!';
+        setTimeout(() => { btn.textContent = prev; }, 2000);
+      }).catch(() => {
+        prompt('Copy this bot invite link:', link);
+      });
+    }
+    return;
   }
 });
 
@@ -543,11 +648,57 @@ function renderModalContent(app) {
     ? `<a href="tel:${escapeHtml(app.phone)}" style="color:var(--cyan)">${escapeHtml(app.phone)}</a>`
     : '<span class="text-dim">N/A</span>';
 
+  // Render full certificates gallery
+  let certsGallery = '';
+  if (app.certificates && app.certificates.length > 0) {
+    const cards = app.certificates.map(c => {
+      const isPdf = c.mimeType === 'application/pdf' || (c.fileName && c.fileName.toLowerCase().endsWith('.pdf'));
+      const preview = isPdf
+        ? `<div class="modal-cert-pdf-preview"><span class="modal-cert-pdf-icon">📄</span><span style="font-size:.65rem;font-weight:700">PDF DOCUMENT</span></div>`
+        : `<img src="${escapeHtml(c.url)}" alt="${escapeHtml(c.originalName)}" onclick="window.open('${escapeHtml(c.url)}', '_blank')" title="Click to view full picture" />`;
+
+      return `
+        <div class="modal-cert-card">
+          <div class="modal-cert-preview">
+            ${preview}
+          </div>
+          <div class="modal-cert-details">
+            <span class="modal-cert-name" title="${escapeHtml(c.originalName)}">${escapeHtml(c.originalName)}</span>
+            <span class="modal-cert-size">${formatFileSize(c.size)} &middot; ${isPdf ? 'PDF' : 'IMAGE'}</span>
+          </div>
+          <div class="modal-cert-btns">
+            <a class="btn-cert-action btn-cert-view" href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer">
+              🔍 VIEW ${isPdf ? 'PDF' : 'IMAGE'}
+            </a>
+            <a class="btn-cert-action btn-cert-dl" href="${escapeHtml(c.url)}" download="${escapeHtml(c.originalName)}">
+              ⬇ SAVE
+            </a>
+          </div>
+        </div>`;
+    }).join('');
+
+    certsGallery = `
+      <div class="modal-certs-section">
+        <div class="modal-certs-title">
+          <span>📎 ATTACHED CERTIFICATES &amp; DOCUMENTS (${app.certificates.length})</span>
+        </div>
+        <div class="modal-certs-grid">
+          ${cards}
+        </div>
+      </div>`;
+  }
+
   modalContent.innerHTML = `
     <div class="modal-meta-grid">
       <div class="meta-item">
         <span class="meta-key">APPLICANT</span>
-        <span class="meta-val">${escapeHtml(app.username)}</span>
+        <span class="meta-val">${escapeHtml(app.fullName || app.username)}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-key">ASSIGNED USERNAME / CALLSIGN</span>
+        <span class="meta-val" style="color:${app.status === 'ACCEPTED' ? 'var(--green)' : 'var(--yellow)'};font-family:var(--font-mono);font-weight:700">
+          ${app.status === 'ACCEPTED' ? `${escapeHtml(app.specialUsername || app.callsign)} ${app.section ? `(${escapeHtml(app.section)})` : ''}` : `PENDING ADMIN APPROVAL ${app.rosterCallsign ? `<span style="color:var(--text-dim);font-weight:normal">(Designated: ${escapeHtml(app.rosterCallsign)})</span>` : ''}`}
+        </span>
       </div>
       <div class="meta-item">
         <span class="meta-key">APPLICATION ID</span>
@@ -592,7 +743,8 @@ function renderModalContent(app) {
     <div class="modal-essay">
       <p class="modal-essay-label">// SUBMITTED ESSAY <span class="text-dim">(${app.essay.length} chars &middot; ${wc} words)</span></p>
       <div class="modal-essay-body">${escapeHtml(app.essay)}</div>
-    </div>`;
+    </div>
+    ${certsGallery}`;
 }
 
 /**
@@ -680,7 +832,7 @@ async function loadAdminMeetings() {
   listEl.innerHTML = '<div class="loading-state"><span class="spinner"></span> LOADING...</div>';
 
   try {
-    const res  = await fetch('/admin/api/meetings');
+    const res  = await fetch(`${ADMIN_BASE}/api/meetings`);
     if (res.status === 401) { showLogin(); return; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -723,7 +875,7 @@ document.addEventListener('click', async e => {
   btn.disabled = true;
   btn.textContent = '...';
   try {
-    const res = await fetch(`/admin/api/meetings/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${ADMIN_BASE}/api/meetings/${id}`, { method: 'DELETE' });
     if (res.status === 401) { showLogin(); return; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const listEl = document.getElementById('meeting-admin-list');
@@ -762,7 +914,7 @@ if (createMeetingBtn) {
     createMeetingBtn.disabled = true;
     createMeetingBtn.textContent = '// SCHEDULING...';
     try {
-      const res = await fetch('/admin/api/meetings', {
+      const res = await fetch(`${ADMIN_BASE}/api/meetings`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ title, domain, date, startTime: start, endTime: end, type, link, description: desc, host }),
