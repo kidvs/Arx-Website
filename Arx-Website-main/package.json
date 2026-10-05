@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "arx-collective",
   "version": "1.0.0",
   "description": "ARX IT Club — Application Server",
@@ -23,12 +22,4 @@
     "node": ">=18.0.0"
   },
   "license": "MIT"
-=======
-  "name": "arx-website-workspace",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "npm --prefix Arx-Website-main run dev",
-    "start": "npm --prefix Arx-Website-main start"
-  }
->>>>>>> 979e078 (Initial commit)
 }
